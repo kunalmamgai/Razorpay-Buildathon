@@ -74,6 +74,19 @@ def get_entry_by_id(entry_id: int) -> dict | None:
         return dict(row) if row else None
 
 
+def get_entries_by_order(order_id: str) -> list[dict]:
+    """Get all ledger entries for a specific Razorpay order, ordered chronologically.
+
+    Returns the full lifecycle: checkout proposal → payment webhook → recovery.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            "SELECT * FROM ledger WHERE razorpay_order_id = ? ORDER BY id ASC",
+            (order_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
+
+
 def get_stats() -> dict:
     """Return aggregate stats for the dashboard stat strip."""
     with get_db() as conn:

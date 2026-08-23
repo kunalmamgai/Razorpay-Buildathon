@@ -27,6 +27,7 @@ export const fetchLedger = (limit = 50, outcome = null) => {
 }
 
 export const fetchLedgerEntry = (id) => request(`/ledger/${id}`)
+export const fetchOrderLifecycle = (orderId) => request(`/ledger/order/${orderId}`)
 export const fetchLedgerStats = () => request('/ledger/stats')
 
 // Campaigns

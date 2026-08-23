@@ -1,6 +1,6 @@
 """Ledger read endpoints for the dashboard."""
 from fastapi import APIRouter, Query
-from backend.ledger.ledger import get_entries, get_entry_by_id, get_stats
+from backend.ledger.ledger import get_entries, get_entry_by_id, get_entries_by_order, get_stats
 
 router = APIRouter(prefix="/api", tags=["ledger"])
 
@@ -22,6 +22,16 @@ def list_ledger(
     """
     entries = get_entries(limit=limit, filter_outcome=outcome)
     return {"entries": entries, "count": len(entries)}
+
+
+@router.get("/ledger/order/{order_id}")
+def get_order_lifecycle(order_id: str):
+    """Get all ledger entries for a specific order — full lifecycle view.
+
+    Returns entries ordered chronologically for the vertical stepper.
+    """
+    entries = get_entries_by_order(order_id)
+    return {"order_id": order_id, "entries": entries, "count": len(entries)}
 
 
 @router.get("/ledger/{entry_id}")

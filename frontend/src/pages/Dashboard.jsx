@@ -4,6 +4,7 @@ import FourStateCard from '../components/FourStateCard'
 import FilterBar from '../components/FilterBar'
 import StatStrip from '../components/StatStrip'
 import CampaignCard from '../components/CampaignCard'
+import FailureRecoveryView from '../components/FailureRecoveryView'
 
 export default function Dashboard() {
   const [entries, setEntries] = useState([])
@@ -13,6 +14,7 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('ledger')
   const [loading, setLoading] = useState(true)
   const [simulating, setSimulating] = useState(null)
+  const [selectedEntry, setSelectedEntry] = useState(null)
 
   const loadData = async () => {
     try {
@@ -119,7 +121,7 @@ export default function Dashboard() {
                 </div>
               ) : (
                 entries.map(entry => (
-                  <div key={entry.id} className="relative group">
+                  <div key={entry.id} className="relative group cursor-pointer" onClick={() => setSelectedEntry(entry)}>
                     <FourStateCard entry={entry} />
                     {/* Simulate failure button for paid entries */}
                     {entry.outcome === 'paid' && entry.razorpay_order_id && (
@@ -155,6 +157,14 @@ export default function Dashboard() {
               ))
             )}
           </div>
+        )}
+
+        {/* Failure/Recovery Detail Drawer */}
+        {selectedEntry && selectedEntry.razorpay_order_id && (
+          <FailureRecoveryView
+            orderId={selectedEntry.razorpay_order_id}
+            onClose={() => setSelectedEntry(null)}
+          />
         )}
       </div>
     </div>
