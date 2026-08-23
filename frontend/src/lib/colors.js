@@ -1,58 +1,47 @@
 /**
- * Centralized state color constants.
- * Maps directly to the design-spec §2.2 color system.
- * Use these instead of hardcoded Tailwind classes when dynamic styling is needed.
+ * Centralized state color helpers.
+ * Maps policy decisions and outcomes to the 6-color system from the design spec.
  */
-export const STATE_COLORS = {
-  ai_proposed: '#3B82F6',
-  clamped_pending: '#F59E0B',
-  approved_complete: '#10B981',
-  rejected_failed: '#EF4444',
+
+const COLORS = {
+  ai: { bg: '#DBEAFE', text: '#3B82F6', border: '#93C5FD' },
+  clamped: { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D' },
+  approved: { bg: '#D1FAE5', text: '#059669', border: '#6EE7B7' },
+  rejected: { bg: '#FEE2E2', text: '#DC2626', border: '#FCA5A5' },
+  dark: { bg: '#1E293B', text: '#F8FAFC', border: '#334155' },
 }
 
-export const SURFACE_COLORS = {
-  dark: '#0F172A',
-  dark_card: '#1E293B',
-  dark_border: '#334155',
-  light: '#FAFAFA',
-  light_card: '#FFFFFF',
+export function getStateColor(decision) {
+  switch (decision) {
+    case 'approved': return COLORS.approved
+    case 'clamped': return COLORS.clamped
+    case 'awaiting_approval': return COLORS.clamped
+    case 'rejected': return COLORS.rejected
+    default: return COLORS.ai
+  }
 }
 
-/**
- * Get the Tailwind class for a given outcome state.
- * Used to dynamically color ledger entries.
- */
 export function getOutcomeColor(outcome) {
   switch (outcome) {
     case 'approved':
     case 'paid':
-      return { bg: 'bg-approved-light', text: 'text-approved', border: 'border-approved', dot: 'bg-approved' }
+    case 'order_created': return COLORS.approved
     case 'clamped':
     case 'awaiting_approval':
-      return { bg: 'bg-clamped-light', text: 'text-clamped', border: 'border-clamped', dot: 'bg-clamped' }
+    case 'pending': return COLORS.clamped
     case 'rejected':
     case 'failed':
-      return { bg: 'bg-rejected-light', text: 'text-rejected', border: 'border-rejected', dot: 'bg-rejected' }
-    case 'reverted':
-      return { bg: 'bg-rejected-light', text: 'text-rejected', border: 'border-rejected', dot: 'bg-rejected' }
-    default:
-      return { bg: 'bg-gray-100', text: 'text-gray-500', border: 'border-gray-300', dot: 'bg-gray-400' }
+    case 'reverted': return COLORS.reJECTED
+    default: return COLORS.ai
   }
 }
 
-/**
- * Get label text for an outcome.
- */
-export function getOutcomeLabel(outcome) {
-  const labels = {
-    approved: 'Approved',
-    clamped: 'Clamped',
-    rejected: 'Rejected',
-    awaiting_approval: 'Awaiting Approval',
-    paid: 'Paid',
-    failed: 'Failed',
-    reverted: 'Reverted',
-    pending: 'Pending',
-  }
-  return labels[outcome] || outcome
+export function formatCurrency(paise) {
+  return `₹${(paise / 100).toLocaleString('en-IN', { minimumFractionDigits: 0 })}`
 }
+
+export function formatDiscount(pct) {
+  return pct > 0 ? `${pct}% off` : 'No discount'
+}
+
+export { COLORS }

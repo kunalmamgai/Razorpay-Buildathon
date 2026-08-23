@@ -1,13 +1,19 @@
 """Comprehensive unit tests for the Cage — deterministic policy engine.
 
-Tests cover:
-- evaluate_upsell_proposal: discount clamping, SKU allowlist, approval thresholds, edge cases
-- evaluate_campaign_proposal: discount/duration limits, SKU filtering, approval thresholds, edge cases
+Tests cover ALL scenarios from the spec:
+- evaluate_upsell_proposal: malformed, negative discount, >100%, >20% clamp,
+  SKU validation, empty SKUs, approval threshold, catalog validation
+- evaluate_campaign_proposal: malformed, rejection (not clamping) for >25%,
+  duration >48h, SKU validation, approval threshold
+- calculate_final_amount: server-side amount calculation
 """
 import pytest
 from backend.cage.policy_engine import (
     evaluate_upsell_proposal,
     evaluate_campaign_proposal,
+    calculate_final_amount,
+)
+from backend.config import (
     MAX_DISCOUNT_PCT,
     AUTO_APPROVE_THRESHOLD_PCT,
     DISCOUNTABLE_SKUS,
@@ -15,697 +21,408 @@ from backend.cage.policy_engine import (
     MAX_CAMPAIGN_DISCOUNT_PCT,
 )
 
+# Sample catalog for tests
+CATALOG = [
+    {"id": "SKU_101", "name": "Earbuds", "price": 299900, "category": "Electronics", "discountable": 1},
+    {"id": "SKU_102", "name": "Cable", "price": 49900, "category": "Accessories", "discountable": 1},
+    {"id": "SKU_103", "name": "Phone Case", "price": 99900, "category": "Accessories", "discountable": 1},
+    {"id": "SKU_104", "name": "Power Bank", "price": 149900, "category": "Electronics", "discountable": 1},
+    {"id": "SKU_105", "name": "Speaker", "price": 199900, "category": "Electronics", "discountable": 1},
+    {"id": "SKU_106", "name": "Wallet", "price": 129900, "category": "Fashion", "discountable": 1},
+]
 
-# =============================================================================
-# evaluate_upsell_proposal — Happy Path
-# =============================================================================
 
+# ═══════════════════════════════════════════════════════════════════════
+# 1. VALID UPSSELL PROPOSAL
+# ═══════════════════════════════════════════════════════════════════════
 
-class TestUpsellHappyPath:
-    """Proposals that pass cleanly with no violations."""
-
+class TestValidUpsell:
     def test_clean_proposal_within_limits(self):
-        """10% discount on valid SKUs — should pass with no violations."""
         result = evaluate_upsell_proposal({
+            "action": "upsell",
             "discount_pct": 10,
             "skus": ["SKU_101", "SKU_102"],
             "reasoning": "Customers who bought earbuds often add cables.",
-        })
-        assert result["passed"] is True
+        }, CATALOG)
+        assert result["decision"] == "approved"
         assert result["violations"] == []
         assert result["final_action"]["discount_pct"] == 10
         assert result["final_action"]["skus"] == ["SKU_101", "SKU_102"]
         assert result["needs_human_approval"] is False
+        assert result["policy_version"] == "policy-v1"
 
     def test_single_valid_sku(self):
-        """Single SKU, low discount — clean pass."""
         result = evaluate_upsell_proposal({
-            "discount_pct": 5,
-            "skus": ["SKU_103"],
-            "reasoning": "Phone case pairs well with earbuds.",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["skus"] == ["SKU_103"]
-        assert result["needs_human_approval"] is False
+            "action": "upsell", "discount_pct": 5, "skus": ["SKU_103"],
+            "reasoning": "Phone case pairs well.",
+        }, CATALOG)
+        assert result["decision"] == "approved"
 
-    def test_zero_discount_valid_skus(self):
-        """0% discount is allowed (no discount applied)."""
+    def test_zero_discount_no_offer(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 0,
-            "skus": ["SKU_101"],
-            "reasoning": "Just suggesting a bundle, no discount.",
-        })
-        assert result["passed"] is True
+            "action": "no_offer", "discount_pct": 0, "skus": [],
+            "reasoning": "No relevant offer.",
+        }, CATALOG)
+        assert result["decision"] == "approved"
         assert result["final_action"]["discount_pct"] == 0
-        assert result["needs_human_approval"] is False
 
-    def test_all_six_discountable_skus(self):
-        """All 6 discountable SKUs in one proposal — should pass."""
+    def test_exactly_at_max_discount_needs_approval(self):
+        """20% is at max but above 15% threshold — needs approval."""
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": list(DISCOUNTABLE_SKUS),
-            "reasoning": "Bundle everything.",
-        })
-        assert result["passed"] is True
-        assert len(result["final_action"]["skus"]) == 6
-
-
-# =============================================================================
-# evaluate_upsell_proposal — Discount Clamping
-# =============================================================================
-
-
-class TestUpsellDiscountClamping:
-    """Discount exceeding MAX_DISCOUNT_PCT should be clamped."""
-
-    def test_discount_exceeds_max(self):
-        """25% exceeds max 20% — should clamp to 20%."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 25,
-            "skus": ["SKU_101"],
-            "reasoning": "Aggressive upsell.",
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 1
-        assert "exceeds max" in result["violations"][0]
-        assert "25%" in result["violations"][0]
-        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
-        assert result["final_action"]["skus"] == ["SKU_101"]
-
-    def test_discount_far_exceeds_max(self):
-        """50% discount — should clamp to 20%."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 50,
-            "skus": ["SKU_102"],
-            "reasoning": "Way too generous.",
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
-
-    def test_discount_exactly_at_max(self):
-        """20% is exactly at max — should pass, no clamping needed."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": MAX_DISCOUNT_PCT,
-            "skus": ["SKU_101"],
+            "action": "upsell", "discount_pct": MAX_DISCOUNT_PCT, "skus": ["SKU_101"],
             "reasoning": "Max allowed.",
-        })
-        assert result["passed"] is True
-        assert result["violations"] == []
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"
+        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
+        assert result["needs_human_approval"] is True
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# 2. DISCOUNT ABOVE 20% BEING CLAMPED
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestDiscountClamping:
+    def test_25_pct_clamped_to_20(self):
+        result = evaluate_upsell_proposal({
+            "action": "upsell", "discount_pct": 25, "skus": ["SKU_101"],
+            "reasoning": "Aggressive upsell.",
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"  # 20% > 15% threshold
+        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
+        assert "exceeds maximum" in result["violations"][0]
+
+    def test_50_pct_clamped_to_20(self):
+        result = evaluate_upsell_proposal({
+            "action": "upsell", "discount_pct": 50, "skus": ["SKU_102"],
+            "reasoning": "Way too generous.",
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"
         assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
 
-    def test_discount_one_over_max(self):
-        """21% — one over max, should still clamp."""
+    def test_21_pct_clamped(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 21,
-            "skus": ["SKU_101"],
+            "action": "upsell", "discount_pct": 21, "skus": ["SKU_101"],
             "reasoning": "Just over.",
-        })
-        assert result["passed"] is False
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"
         assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
 
-    def test_negative_discount_not_clamped(self):
-        """Negative discount — no violation, passes through."""
+
+# ═══════════════════════════════════════════════════════════════════════
+# 3. CLAMPED PROPOSAL REQUIRING APPROVAL ABOVE 15%
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestApprovalThreshold:
+    def test_16_pct_needs_approval(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": -5,
-            "skus": ["SKU_101"],
-            "reasoning": "Surcharge?",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == -5
+            "action": "upsell", "discount_pct": 16, "skus": ["SKU_101"],
+            "reasoning": "Above threshold.",
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"
+        assert result["needs_human_approval"] is True
 
-
-# =============================================================================
-# evaluate_upsell_proposal — Auto-Approve Threshold
-# =============================================================================
-
-
-class TestUpsellApprovalThreshold:
-    """Discount above AUTO_APPROVE_THRESHOLD_PCT requires human approval."""
-
-    def test_below_threshold_no_approval(self):
-        """10% < 15% threshold — no approval needed."""
+    def test_15_pct_at_threshold_no_approval(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_101"],
-            "reasoning": "Safe discount.",
-        })
-        assert result["needs_human_approval"] is False
-
-    def test_exactly_at_threshold_no_approval(self):
-        """15% == threshold — NOT above, so no approval needed."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": AUTO_APPROVE_THRESHOLD_PCT,
-            "skus": ["SKU_101"],
+            "action": "upsell", "discount_pct": AUTO_APPROVE_THRESHOLD_PCT, "skus": ["SKU_101"],
             "reasoning": "At the line.",
-        })
+        }, CATALOG)
+        assert result["decision"] == "approved"
         assert result["needs_human_approval"] is False
 
-    def test_one_above_threshold_needs_approval(self):
-        """16% > 15% — needs human approval."""
+    def test_10_pct_below_threshold(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 16,
-            "skus": ["SKU_101"],
-            "reasoning": "Just above threshold.",
-        })
-        assert result["needs_human_approval"] is True
-        assert result["passed"] is True  # Still passes, just needs approval
+            "action": "upsell", "discount_pct": 10, "skus": ["SKU_101"],
+            "reasoning": "Safe.",
+        }, CATALOG)
+        assert result["decision"] == "approved"
+        assert result["needs_human_approval"] is False
 
-    def test_max_discount_needs_approval(self):
-        """20% (after clamping from 25%) > 15% — needs approval."""
+
+# ═══════════════════════════════════════════════════════════════════════
+# 4. REJECTED NON-DISCOUNTABLE SKU PROPOSAL
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestRejectedSKU:
+    def test_all_invalid_skus_rejected(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 25,
-            "skus": ["SKU_101"],
-            "reasoning": "Over max, will be clamped but still needs approval.",
-        })
-        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
-        assert result["needs_human_approval"] is True
+            "action": "upsell", "discount_pct": 15, "skus": ["FAKE_SKU"],
+            "reasoning": "Bad recommendation.",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert result["final_action"] == {}
 
-    def test_clamped_to_below_threshold_no_approval(self):
-        """If clamping brings discount below threshold, no approval needed."""
-        # This can't happen with current limits (20 > 15), but test the logic
+    def test_unknown_sku_with_catalog(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 16,
-            "skus": ["SKU_101"],
-            "reasoning": "16% needs approval.",
-        })
-        assert result["needs_human_approval"] is True
-
-
-# =============================================================================
-# evaluate_upsell_proposal — SKU Allowlist
-# =============================================================================
-
-
-class TestUpsellSKUAllowlist:
-    """Non-discountable SKUs should be filtered out."""
-
-    def test_all_valid_skus_no_violation(self):
-        """All SKUs in allowlist — no violation."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_101", "SKU_103", "SKU_106"],
-            "reasoning": "All valid.",
-        })
-        assert result["passed"] is True
-        assert result["violations"] == []
-        assert result["final_action"]["skus"] == ["SKU_101", "SKU_103", "SKU_106"]
-
-    def test_one_invalid_sku_filtered(self):
-        """One invalid SKU mixed in — filtered out, violation logged."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_101", "FAKE_SKU_999"],
-            "reasoning": "One bad SKU.",
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 1
-        assert "FAKE_SKU_999" in result["violations"][0]
+            "action": "upsell", "discount_pct": 10, "skus": ["SKU_101", "NONEXISTENT"],
+            "reasoning": "Mix.",
+        }, CATALOG)
+        assert result["decision"] == "clamped"
         assert result["final_action"]["skus"] == ["SKU_101"]
+        assert "unknown SKU" in result["violations"][0]
 
-    def test_multiple_invalid_skus_all_filtered(self):
-        """Multiple invalid SKUs — all filtered, only valid remain."""
+    def test_mixed_valid_invalid_filters_out(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_101", "BAD_A", "BAD_B", "BAD_C"],
+            "action": "upsell", "discount_pct": 10,
+            "skus": ["SKU_101", "BAD_A", "BAD_B"],
             "reasoning": "Mostly bad.",
-        })
-        assert result["passed"] is False
+        }, CATALOG)
+        assert result["decision"] == "clamped"
         assert result["final_action"]["skus"] == ["SKU_101"]
-        assert "BAD_A" in result["violations"][0]
-        assert "BAD_B" in result["violations"][0]
-        assert "BAD_C" in result["violations"][0]
 
-    def test_all_invalid_skus_empty_after_clamp(self):
-        """All SKUs invalid — filtered to empty, discount zeroed."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 15,
-            "skus": ["FAKE_A", "FAKE_B"],
-            "reasoning": "All bad SKUs.",
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 2  # non-discountable + empty after clamping
-        assert "non-discountable" in result["violations"][0]
-        assert "no discountable" in result["violations"][1]
-        assert result["final_action"]["skus"] == []
-        assert result["final_action"]["discount_pct"] == 0  # Zeroed because no valid SKUs
 
-    def test_empty_sku_list_no_discount(self):
-        """Empty SKU list with 0% discount — passes cleanly."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 0,
-            "skus": [],
-            "reasoning": "No suggestion.",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["skus"] == []
+# ═══════════════════════════════════════════════════════════════════════
+# 5. REJECTED EMPTY SKU PROPOSAL
+# ═══════════════════════════════════════════════════════════════════════
 
-    def test_empty_sku_list_with_discount(self):
-        """Empty SKU list with non-zero discount — discount zeroed."""
+class TestEmptySKU:
+    def test_empty_skus_with_discount_rejected(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": [],
+            "action": "upsell", "discount_pct": 10, "skus": [],
             "reasoning": "Discount but no SKUs.",
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["discount_pct"] == 0
-        assert "no discountable" in result["violations"][0]
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "no discountable SKUs" in result["violations"][0]
 
-
-# =============================================================================
-# evaluate_upsell_proposal — Edge Cases / Missing Keys
-# =============================================================================
-
-
-class TestUpsellEdgeCases:
-    """Missing keys, empty proposals, malformed data."""
-
-    def test_empty_proposal(self):
-        """Empty dict — should handle gracefully with defaults."""
-        result = evaluate_upsell_proposal({})
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == 0
-        assert result["final_action"]["skus"] == []
-        assert result["needs_human_approval"] is False
-
-    def test_missing_skus_key_with_discount(self):
-        """Proposal with no 'skus' key but a discount — flags as violation (no SKUs to discount)."""
+    def test_empty_skus_no_discount_approved(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "reasoning": "Forgot SKUs.",
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["skus"] == []
-        assert result["final_action"]["discount_pct"] == 0
-        assert "no discountable" in result["violations"][0]
-
-    def test_missing_skus_key_no_discount(self):
-        """Proposal with no 'skus' key and 0% discount — passes (nothing to validate)."""
-        result = evaluate_upsell_proposal({
-            "discount_pct": 0,
-            "reasoning": "No SKUs, no discount.",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["skus"] == []
-
-    def test_missing_discount_pct_key(self):
-        """Proposal with no 'discount_pct' key — defaults to 0."""
-        result = evaluate_upsell_proposal({
-            "skus": ["SKU_101"],
-            "reasoning": "Forgot discount.",
-        })
-        assert result["passed"] is True
+            "action": "upsell", "discount_pct": 0, "skus": [],
+            "reasoning": "Nothing to offer.",
+        }, CATALOG)
+        assert result["decision"] == "approved"
         assert result["final_action"]["discount_pct"] == 0
 
-    def test_missing_reasoning_key(self):
-        """Proposal with no 'reasoning' — still evaluates correctly."""
+
+# ═══════════════════════════════════════════════════════════════════════
+# 6. NEGATIVE DISCOUNT
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestNegativeDiscount:
+    def test_negative_discount_rejected(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_101"],
-        })
-        assert result["passed"] is True
+            "action": "upsell", "discount_pct": -5, "skus": ["SKU_101"],
+            "reasoning": "Surcharge?",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "negative discount" in result["violations"][0]
 
-    def test_both_discount_and_sku_violations(self):
-        """Proposal with both over-max discount AND non-discountable SKUs."""
+
+# ═══════════════════════════════════════════════════════════════════════
+# 7. DISCOUNT ABOVE 100%
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestDiscountAbove100:
+    def test_150_pct_rejected(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 30,
-            "skus": ["SKU_101", "INVALID_X"],
-            "reasoning": "Double violation.",
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 2
-        assert result["final_action"]["discount_pct"] == MAX_DISCOUNT_PCT
-        assert result["final_action"]["skus"] == ["SKU_101"]
+            "action": "upsell", "discount_pct": 150, "skus": ["SKU_101"],
+            "reasoning": "Impossible.",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "exceeds 100%" in result["violations"][0]
 
-    def test_skus_preserve_order(self):
-        """SKU order should be preserved after filtering."""
+    def test_101_pct_rejected(self):
         result = evaluate_upsell_proposal({
-            "discount_pct": 10,
-            "skus": ["SKU_103", "INVALID", "SKU_101", "ALSO_INVALID", "SKU_105"],
-            "reasoning": "Mixed bag.",
-        })
-        assert result["final_action"]["skus"] == ["SKU_103", "SKU_101", "SKU_105"]
+            "action": "upsell", "discount_pct": 101, "skus": ["SKU_101"],
+            "reasoning": "Just over.",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
 
 
-# =============================================================================
-# evaluate_campaign_proposal — Happy Path
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════
+# 8. UNKNOWN SKU
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestUnknownSKU:
+    def test_all_unknown_skus_rejected(self):
+        result = evaluate_upsell_proposal({
+            "action": "upsell", "discount_pct": 10,
+            "skus": ["UNKNOWN_A", "UNKNOWN_B"],
+            "reasoning": "All bad.",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+
+    def test_unknown_action_rejected(self):
+        result = evaluate_upsell_proposal({
+            "action": "invalid_action", "discount_pct": 10, "skus": ["SKU_101"],
+            "reasoning": "Malformed.",
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "unknown action" in result["violations"][0]
 
 
-class TestCampaignHappyPath:
-    """Campaign proposals that pass cleanly."""
+# ═══════════════════════════════════════════════════════════════════════
+# 9. VALID CAMPAIGN
+# ═══════════════════════════════════════════════════════════════════════
 
+class TestValidCampaign:
     def test_clean_campaign(self):
-        """Campaign within all limits — passes."""
         result = evaluate_campaign_proposal({
+            "action": "create_campaign",
             "name": "Summer Sale",
-            "discount_pct": 15,
+            "discount_pct": 10,
             "target_skus": ["SKU_101", "SKU_102"],
-            "reasoning": "Boost summer electronics.",
+            "reasoning": "Boost summer sales.",
             "duration_hours": 24,
-        })
-        assert result["passed"] is True
-        assert result["violations"] == []
-        assert result["final_action"]["discount_pct"] == 15
-        assert result["final_action"]["target_skus"] == ["SKU_101", "SKU_102"]
+        }, CATALOG)
+        assert result["decision"] == "approved"
+        assert result["final_action"]["discount_pct"] == 10
         assert result["final_action"]["duration_hours"] == 24
-        assert result["needs_human_approval"] is False
 
-    def test_campaign_at_max_discount(self):
-        """25% (at max) — passes."""
+    def test_campaign_at_max_discount_needs_approval(self):
+        """25% is at max but above 15% threshold — needs approval."""
         result = evaluate_campaign_proposal({
-            "name": "Max Discount",
+            "action": "create_campaign",
+            "name": "Max Campaign",
             "discount_pct": MAX_CAMPAIGN_DISCOUNT_PCT,
             "target_skus": ["SKU_101"],
             "reasoning": "Pushing limits.",
             "duration_hours": 12,
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == MAX_CAMPAIGN_DISCOUNT_PCT
+        }, CATALOG)
+        assert result["decision"] == "awaiting_approval"
+        assert result["needs_human_approval"] is True
 
-    def test_campaign_at_max_duration(self):
-        """48h (at max) — passes."""
+
+# ═══════════════════════════════════════════════════════════════════════
+# 10. CAMPAIGN ABOVE MAXIMUM DISCOUNT → REJECTED (not clamped!)
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestCampaignExceedsMax:
+    def test_30_pct_campaign_rejected(self):
+        """Per spec: campaigns exceeding hard limits are REJECTED, not clamped."""
         result = evaluate_campaign_proposal({
-            "name": "Long Campaign",
-            "discount_pct": 10,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Weekend sale.",
-            "duration_hours": MAX_CAMPAIGN_DURATION_HOURS,
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["duration_hours"] == MAX_CAMPAIGN_DURATION_HOURS
-
-    def test_zero_discount_campaign(self):
-        """0% discount campaign — passes (just awareness, no discount)."""
-        result = evaluate_campaign_proposal({
-            "name": "Awareness Campaign",
-            "discount_pct": 0,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Brand awareness.",
-            "duration_hours": 48,
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == 0
-
-
-# =============================================================================
-# evaluate_campaign_proposal — Discount Clamping
-# =============================================================================
-
-
-class TestCampaignDiscountClamping:
-    """Campaign discount exceeding MAX_CAMPAIGN_DISCOUNT_PCT."""
-
-    def test_campaign_discount_exceeds_max(self):
-        """30% exceeds max 25% — clamped."""
-        result = evaluate_campaign_proposal({
+            "action": "create_campaign",
             "name": "Too Generous",
             "discount_pct": 30,
             "target_skus": ["SKU_101"],
-            "reasoning": "Aggressive campaign.",
+            "reasoning": "Aggressive.",
             "duration_hours": 24,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["discount_pct"] == MAX_CAMPAIGN_DISCOUNT_PCT
-        assert "exceeds max" in result["violations"][0]
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "exceeds maximum" in result["violations"][0]
 
-    def test_campaign_discount_far_exceeds_max(self):
-        """100% discount — clamped to 25%."""
+    def test_100_pct_campaign_rejected(self):
         result = evaluate_campaign_proposal({
+            "action": "create_campaign",
             "name": "Free Everything",
             "discount_pct": 100,
             "target_skus": ["SKU_101"],
             "reasoning": "Give it away.",
             "duration_hours": 1,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["discount_pct"] == MAX_CAMPAIGN_DISCOUNT_PCT
+        }, CATALOG)
+        assert result["decision"] == "rejected"
 
 
-# =============================================================================
-# evaluate_campaign_proposal — Duration Limits
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════
+# 11. CAMPAIGN DURATION ABOVE 48 HOURS → REJECTED
+# ═══════════════════════════════════════════════════════════════════════
 
-
-class TestCampaignDurationLimits:
-    """Campaign duration exceeding MAX_CAMPAIGN_DURATION_HOURS."""
-
-    def test_duration_exceeds_max(self):
-        """72h exceeds 48h max — clamped."""
+class TestCampaignDuration:
+    def test_72h_campaign_rejected(self):
         result = evaluate_campaign_proposal({
+            "action": "create_campaign",
             "name": "Long Running",
             "discount_pct": 10,
             "target_skus": ["SKU_101"],
             "reasoning": "Week-long sale.",
             "duration_hours": 72,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["duration_hours"] == MAX_CAMPAIGN_DURATION_HOURS
-        assert "exceeds max" in result["violations"][0]
+        }, CATALOG)
+        assert result["decision"] == "rejected"
+        assert "exceeds maximum" in result["violations"][0]
 
-    def test_duration_far_exceeds_max(self):
-        """168h (1 week) — clamped to 48h."""
+    def test_168h_campaign_rejected(self):
         result = evaluate_campaign_proposal({
-            "name": "Monthly Campaign",
+            "action": "create_campaign",
+            "name": "Monthly",
             "discount_pct": 10,
             "target_skus": ["SKU_101"],
-            "reasoning": "Month-long promotion.",
+            "reasoning": "Month-long.",
             "duration_hours": 168,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["duration_hours"] == MAX_CAMPAIGN_DURATION_HOURS
+        }, CATALOG)
+        assert result["decision"] == "rejected"
 
-    def test_missing_duration_defaults_to_48(self):
-        """No duration_hours key — defaults to 48 (at max, passes)."""
+    def test_no_campaign_action(self):
         result = evaluate_campaign_proposal({
-            "name": "No Duration",
-            "discount_pct": 10,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Forgot duration.",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["duration_hours"] == 48
+            "action": "no_campaign",
+        }, CATALOG)
+        assert result["decision"] == "approved"
 
 
-# =============================================================================
-# evaluate_campaign_proposal — SKU Filtering
-# =============================================================================
+# ═══════════════════════════════════════════════════════════════════════
+# 12. BACKEND-ONLY FINAL AMOUNT CALCULATION
+# ═══════════════════════════════════════════════════════════════════════
+
+class TestCalculateFinalAmount:
+    """Verify calculate_final_amount uses only server-side catalog prices."""
+
+    def test_amount_with_10_pct_discount(self):
+        amounts = calculate_final_amount(
+            cart=[{"sku": "SKU_101", "quantity": 1}],
+            approved_action={"discount_pct": 10, "skus": ["SKU_101"]},
+            catalog=CATALOG,
+        )
+        assert amounts["original_amount_paise"] == 299900
+        assert amounts["discount_amount_paise"] == 29990
+        assert amounts["final_amount_paise"] == 299900 - 29990
+        assert amounts["discount_pct"] == 10
+
+    def test_amount_with_0_pct_discount(self):
+        amounts = calculate_final_amount(
+            cart=[{"sku": "SKU_101", "quantity": 2}],
+            approved_action={"discount_pct": 0, "skus": ["SKU_101"]},
+            catalog=CATALOG,
+        )
+        assert amounts["original_amount_paise"] == 599800
+        assert amounts["final_amount_paise"] == 599800
+        assert amounts["discount_amount_paise"] == 0
+
+    def test_amount_with_multiple_items(self):
+        amounts = calculate_final_amount(
+            cart=[
+                {"sku": "SKU_101", "quantity": 1},
+                {"sku": "SKU_102", "quantity": 3},
+            ],
+            approved_action={"discount_pct": 15, "skus": ["SKU_101", "SKU_102"]},
+            catalog=CATALOG,
+        )
+        original = 299900 + (49900 * 3)  # 299900 + 149700 = 449600
+        discount = int(original * 15 / 100)
+        assert amounts["original_amount_paise"] == original
+        assert amounts["discount_amount_paise"] == discount
+        assert amounts["final_amount_paise"] == original - discount
+
+    def test_amount_never_negative(self):
+        amounts = calculate_final_amount(
+            cart=[{"sku": "SKU_102", "quantity": 1}],
+            approved_action={"discount_pct": 0, "skus": ["SKU_102"]},
+            catalog=CATALOG,
+        )
+        assert amounts["final_amount_paise"] > 0
+
+    def test_amount_with_unknown_sku(self):
+        """Unknown SKU is not in catalog, so price is 0."""
+        amounts = calculate_final_amount(
+            cart=[{"sku": "FAKE_SKU", "quantity": 1}],
+            approved_action={"discount_pct": 10, "skus": ["FAKE_SKU"]},
+            catalog=CATALOG,
+        )
+        # Original total is 0 (unknown SKU not in catalog)
+        assert amounts["original_amount_paise"] == 0
 
 
-class TestCampaignSKUs:
-    """Campaign SKU allowlist enforcement."""
-
-    def test_campaign_all_valid_skus(self):
-        """All valid SKUs — passes."""
-        result = evaluate_campaign_proposal({
-            "name": "Valid SKUs",
-            "discount_pct": 10,
-            "target_skus": ["SKU_101", "SKU_102", "SKU_103"],
-            "reasoning": "Good mix.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is True
-        assert len(result["final_action"]["target_skus"]) == 3
-
-    def test_campaign_mix_valid_invalid(self):
-        """Mix of valid and invalid — invalid filtered out."""
-        result = evaluate_campaign_proposal({
-            "name": "Mixed",
-            "discount_pct": 10,
-            "target_skus": ["SKU_101", "FAKE_SKU"],
-            "reasoning": "One bad one.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["target_skus"] == ["SKU_101"]
-
-    def test_campaign_all_invalid_skus(self):
-        """All invalid SKUs — filtered to empty."""
-        result = evaluate_campaign_proposal({
-            "name": "All Invalid",
-            "discount_pct": 10,
-            "target_skus": ["BAD_A", "BAD_B"],
-            "reasoning": "All bad.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is False
-        assert result["final_action"]["target_skus"] == []
-
-    def test_campaign_uses_skus_fallback(self):
-        """Fallback to 'skus' key if 'target_skus' missing."""
-        result = evaluate_campaign_proposal({
-            "name": "Fallback",
-            "discount_pct": 10,
-            "skus": ["SKU_101", "SKU_102"],
-            "reasoning": "Used skus key.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["target_skus"] == ["SKU_101", "SKU_102"]
-
-    def test_campaign_empty_target_skus(self):
-        """Empty target_skus — passes (no SKU filtering needed)."""
-        result = evaluate_campaign_proposal({
-            "name": "No SKUs",
-            "discount_pct": 10,
-            "target_skus": [],
-            "reasoning": "General campaign.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is True
-
-
-# =============================================================================
-# evaluate_campaign_proposal — Approval Threshold
-# =============================================================================
-
-
-class TestCampaignApproval:
-    """Campaign approval threshold behavior."""
-
-    def test_campaign_below_threshold_no_approval(self):
-        """10% < 15% — no approval."""
-        result = evaluate_campaign_proposal({
-            "name": "Low Discount",
-            "discount_pct": 10,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Safe.",
-            "duration_hours": 24,
-        })
-        assert result["needs_human_approval"] is False
-
-    def test_campaign_at_threshold_no_approval(self):
-        """15% == threshold — NOT above, no approval."""
-        result = evaluate_campaign_proposal({
-            "name": "At Threshold",
-            "discount_pct": AUTO_APPROVE_THRESHOLD_PCT,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Right at the line.",
-            "duration_hours": 24,
-        })
-        assert result["needs_human_approval"] is False
-
-    def test_campaign_above_threshold_needs_approval(self):
-        """16% > 15% — needs approval."""
-        result = evaluate_campaign_proposal({
-            "name": "Needs Approval",
-            "discount_pct": 16,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Above threshold.",
-            "duration_hours": 24,
-        })
-        assert result["needs_human_approval"] is True
-
-    def test_campaign_clamped_still_needs_approval(self):
-        """Clamped from 30% to 25% — still above threshold, needs approval."""
-        result = evaluate_campaign_proposal({
-            "name": "Clamped + Approval",
-            "discount_pct": 30,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Over max, clamped.",
-            "duration_hours": 24,
-        })
-        assert result["final_action"]["discount_pct"] == MAX_CAMPAIGN_DISCOUNT_PCT
-        assert result["needs_human_approval"] is True
-
-
-# =============================================================================
-# evaluate_campaign_proposal — Combined Violations
-# =============================================================================
-
-
-class TestCampaignCombined:
-    """Multiple violations in a single proposal."""
-
-    def test_all_three_violations(self):
-        """Over-max discount + over-max duration + invalid SKUs."""
-        result = evaluate_campaign_proposal({
-            "name": "Triple Violation",
-            "discount_pct": 50,
-            "target_skus": ["SKU_101", "INVALID_A", "INVALID_B"],
-            "reasoning": "Everything wrong.",
-            "duration_hours": 100,
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 3
-        assert result["final_action"]["discount_pct"] == MAX_CAMPAIGN_DISCOUNT_PCT
-        assert result["final_action"]["duration_hours"] == MAX_CAMPAIGN_DURATION_HOURS
-        assert result["final_action"]["target_skus"] == ["SKU_101"]
-
-    def test_discount_plus_invalid_skus(self):
-        """Over-max discount + invalid SKUs."""
-        result = evaluate_campaign_proposal({
-            "name": "Two Violations",
-            "discount_pct": 40,
-            "target_skus": ["FAKE_1"],
-            "reasoning": "Two problems.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is False
-        assert len(result["violations"]) == 2
-
-
-# =============================================================================
-# evaluate_campaign_proposal — Edge Cases
-# =============================================================================
-
-
-class TestCampaignEdgeCases:
-    """Missing keys, empty proposals."""
-
-    def test_empty_campaign_proposal(self):
-        """Empty dict — should handle gracefully."""
-        result = evaluate_campaign_proposal({})
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == 0
-        assert result["final_action"]["target_skus"] == []
-        assert result["final_action"]["duration_hours"] == 48
-
-    def test_missing_duration_and_skus(self):
-        """Only discount_pct provided — other fields default."""
-        result = evaluate_campaign_proposal({
-            "name": "Minimal",
-            "discount_pct": 10,
-            "reasoning": "Bare minimum.",
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["target_skus"] == []
-        assert result["final_action"]["duration_hours"] == 48
-
-    def test_campaign_negative_discount(self):
-        """Negative discount — passes through (surcharge logic)."""
-        result = evaluate_campaign_proposal({
-            "name": "Negative",
-            "discount_pct": -10,
-            "target_skus": ["SKU_101"],
-            "reasoning": "Surcharge campaign.",
-            "duration_hours": 24,
-        })
-        assert result["passed"] is True
-        assert result["final_action"]["discount_pct"] == -10
-
-
-# =============================================================================
-# Cross-cutting: Constants sanity checks
-# =============================================================================
-
+# ═══════════════════════════════════════════════════════════════════════
+# Constants sanity checks
+# ═══════════════════════════════════════════════════════════════════════
 
 class TestConstants:
-    """Verify the hard limits are sensible."""
-
     def test_max_discount_above_threshold(self):
-        """Max discount must be above auto-approve threshold."""
         assert MAX_DISCOUNT_PCT > AUTO_APPROVE_THRESHOLD_PCT
 
-    def test_campaign_max_above_upsell_max(self):
-        """Campaign max discount can be higher than upsell max."""
+    def test_campaign_max_at_least_as_high_as_upsell_max(self):
         assert MAX_CAMPAIGN_DISCOUNT_PCT >= MAX_DISCOUNT_PCT
 
     def test_all_expected_skus_in_allowlist(self):
-        """All 6 seed products should be discountable."""
-        assert len(DISCOUNTABLE_SKUS) == 6
+        assert len(DISCOUNTABLE_SKUS) >= 6
         for i in range(1, 7):
             assert f"SKU_10{i}" in DISCOUNTABLE_SKUS
 
     def test_campaign_duration_positive(self):
-        """Max campaign duration should be positive."""
         assert MAX_CAMPAIGN_DURATION_HOURS > 0

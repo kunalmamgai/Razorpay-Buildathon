@@ -1,27 +1,22 @@
-import React from 'react'
+const STAT_ITEMS = [
+  { key: 'total_proposals', label: 'Total Proposals', color: 'text-white' },
+  { key: 'approved', label: 'Approved', color: 'text-approved' },
+  { key: 'clamped', label: 'Clamped', color: 'text-clamped' },
+  { key: 'awaiting_approval', label: 'Awaiting', color: 'text-clamped' },
+  { key: 'rejected', label: 'Rejected', color: 'text-rejected' },
+  { key: 'paid', label: 'Paid', color: 'text-approved' },
+  { key: 'failed', label: 'Failed', color: 'text-rejected' },
+]
 
 export default function StatStrip({ stats }) {
-  if (!stats) return null
-
-  const items = [
-    { label: 'Total Proposals', value: stats.total_proposals, color: 'text-gray-200' },
-    { label: 'Approved', value: stats.approved, color: 'text-approved' },
-    { label: 'Clamped', value: stats.clamped, color: 'text-clamped' },
-    { label: 'Rejected', value: stats.rejected, color: 'text-rejected' },
-    { label: 'Awaiting', value: stats.awaiting_approval, color: 'text-clamped' },
-    { label: 'Rejection Rate', value: `${stats.rejection_rate}%`, color: 'text-gray-400' },
-  ]
-
   return (
-    <div className="flex gap-4 mb-4 p-3 rounded-lg bg-surface-dark-card border border-surface-dark-border">
-      {items.map(item => (
-        <div key={item.label} className="flex flex-col items-center min-w-[80px]">
-          <span className={`font-mono text-lg font-bold ${item.color}`}>
-            {item.value}
-          </span>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">
-            {item.label}
-          </span>
+    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
+      {STAT_ITEMS.map(item => (
+        <div key={item.key} className="bg-surface-dark-card rounded-xl p-3 text-center">
+          <p className="text-2xl font-bold font-mono text-white">
+            {stats[item.key] ?? 0}
+          </p>
+          <p className={`text-xs mt-1 ${item.color}`}>{item.label}</p>
         </div>
       ))}
     </div>

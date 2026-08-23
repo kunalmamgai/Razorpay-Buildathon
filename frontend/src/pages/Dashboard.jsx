@@ -1,65 +1,64 @@
-import React, { useState, useEffect } from 'react'
-import { fetchLedger, fetchLedgerStats, fetchCampaigns, approveCampaign, rejectCampaign, simulatePaymentFailure } from '../api'
-import FourStateCard from '../components/FourStateCard'
-import FilterBar from '../components/FilterBar'
+import { useState, useEffect } from 'react'
+import { fetchLedger, fetchLedgerStats, fetchCampaigns, reviewCampaign, approveCampaign, rejectCampaign, simulatePaymentFailure } from '../api'
 import StatStrip from '../components/StatStrip'
-import CampaignCard from '../components/CampaignCard'
+import FilterBar from '../components/FilterBar'
+import FourStateCard from '../components/FourStateCard'
 import FailureRecoveryView from '../components/FailureRecoveryView'
+import ApprovalPanel from '../components/ApprovalPanel'
+import CampaignCard from '../components/CampaignCard'
 
 export default function Dashboard() {
-  const [entries, setEntries] = useState([])
-  const [stats, setStats] = useState(null)
-  const [campaigns, setCampaigns] = useState([])
+  const [tab, setTab] = useState('ledger') // ledger | campaigns | approvals
+  const [ledger, setLedger] = useState([])
+  const [stats, setStats] = useState({})
   const [filter, setFilter] = useState(null)
-  const [activeTab, setActiveTab] = useState('ledger')
-  const [loading, setLoading] = useState(true)
-  const [simulating, setSimulating] = useState(null)
   const [selectedEntry, setSelectedEntry] = useState(null)
+  const [campaigns, setCampaigns] = useState([])
+  const [loading, setLoading] = useState(false)
 
-  const loadData = async () => {
+  const refreshLedger = async () => {
     try {
-      const [ledgerRes, statsRes, campaignRes] = await Promise.all([
-        fetchLedger(50, filter),
+      const [ledgerData, statsData] = await Promise.all([
+        fetchLedger(100, filter),
         fetchLedgerStats(),
-        fetchCampaigns(),
       ])
-      setEntries(ledgerRes.entries || [])
-      setStats(statsRes)
-      setCampaigns(Array.isArray(campaignRes) ? campaignRes : campaignRes.campaigns || [])
-    } catch (err) {
-      console.error('Failed to load dashboard data:', err)
-    } finally {
-      setLoading(false)
+      setLedger(ledgerData.entries)
+      setStats(statsData)
+    } catch (e) {
+      console.error('Failed to fetch ledger:', e)
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [filter])
-
-  // Auto-refresh every 5 seconds for live feel
-  useEffect(() => {
-    const interval = setInterval(loadData, 5000)
-    return () => clearInterval(interval)
-  }, [filter])
-
-  const handleApprove = async (id) => {
-    await approveCampaign(id)
-    loadData()
+  const refreshCampaigns = async () => {
+    try {
+      const data = await fetchCampaigns()
+      setCampaigns(data.campaigns)
+    } catch (e) {
+      console.error('Failed to fetch campaigns:', e)
+    }
   }
 
-  const handleReject = async (id) => {
-    await rejectCampaign(id)
-    loadData()
+  useEffect(() => { refreshLedger() }, [filter])
+  useEffect(() => { if (tab === 'campaigns') refreshCampaigns() }, [tab])
+
+  const handleReviewCampaign = async () => {
+    setLoading(true)
+    try {
+      await reviewCampaign()
+      await refreshCampaigns()
+      await refreshLedger()
+    } catch (e) {
+      console.error('Campaign review failed:', e)
+    }
+    setLoading(false)
   }
 
   const handleSimulateFailure = async (orderId) => {
-    setSimulating(orderId)
     try {
       await simulatePaymentFailure(orderId)
-      loadData()
-    } finally {
-      setSimulating(null)
+      await refreshLedger()
+    } catch (e) {
+      console.error('Simulation failed:', e)
     }
   }
 
@@ -69,104 +68,99 @@ export default function Dashboard() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Marlin Dashboard</h1>
-            <p className="text-sm text-gray-400 mt-1">Live audit feed & campaign controls</p>
+            <h1 className="text-2xl font-bold">Dashboard</h1>
+            <p className="text-gray-400 text-sm mt-1">Marlin Growth Agent — Live Control Room</p>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-approved animate-pulse" />
-            <span className="text-xs font-mono text-gray-400">Live</span>
-          </div>
-        </div>
-
-        {/* Agent Activity Strip */}
-        <div className="mb-6 p-3 rounded-lg bg-surface-dark-card border border-surface-dark-border flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-ai-proposed">&#x2728;</span>
-            <span className="text-sm text-gray-300">Campaign Orchestrator</span>
-          </div>
-          <span className="text-xs font-mono text-gray-500">Next review in 47 min</span>
-        </div>
-
-        {/* Tab Bar */}
-        <div className="flex gap-4 mb-6 border-b border-surface-dark-border pb-3">
           <button
-            onClick={() => setActiveTab('ledger')}
-            className={`text-sm font-medium transition ${activeTab === 'ledger' ? 'text-white border-b-2 border-ai-proposed' : 'text-gray-500 hover:text-gray-300'}`}
+            onClick={refreshLedger}
+            className="text-sm text-gray-400 hover:text-white transition border border-surface-dark-border px-3 py-1.5 rounded-lg"
           >
-            Live Ledger Feed
-          </button>
-          <button
-            onClick={() => setActiveTab('campaigns')}
-            className={`text-sm font-medium transition ${activeTab === 'campaigns' ? 'text-white border-b-2 border-ai-proposed' : 'text-gray-500 hover:text-gray-300'}`}
-          >
-            Campaigns
+            ↻ Refresh
           </button>
         </div>
 
-        {activeTab === 'ledger' && (
+        {/* Stats */}
+        <StatStrip stats={stats} />
+
+        {/* Tabs */}
+        <div className="flex gap-1 bg-surface-dark-card rounded-xl p-1 mb-6">
+          {[
+            { id: 'ledger', label: 'Live Ledger Feed' },
+            { id: 'campaigns', label: 'Campaigns' },
+            { id: 'approvals', label: 'Approvals' },
+          ].map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${
+                tab === t.id ? 'bg-ai-proposed text-white' : 'text-gray-400 hover:text-white'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        {tab === 'ledger' && (
           <>
-            {/* Stat Strip */}
-            <StatStrip stats={stats} />
-
-            {/* Filter Bar */}
-            <FilterBar active={filter} onChange={setFilter} />
-
-            {/* Ledger Feed */}
-            <div className="space-y-3 ledger-scroll max-h-[calc(100vh-400px)] overflow-y-auto pr-2">
-              {loading ? (
-                <div className="text-center text-gray-500 py-12">Loading ledger...</div>
-              ) : entries.length === 0 ? (
-                <div className="text-center text-gray-500 py-12">
-                  No entries yet. Make a purchase from the Storefront to see the ledger in action.
-                </div>
+            <FilterBar filter={filter} setFilter={setFilter} />
+            <div className="space-y-3 mt-4 max-h-[60vh] overflow-y-auto ledger-scroll pr-2">
+              {ledger.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No ledger entries yet. Make a checkout to see events.</p>
               ) : (
-                entries.map(entry => (
-                  <div key={entry.id} className="relative group cursor-pointer" onClick={() => setSelectedEntry(entry)}>
-                    <FourStateCard entry={entry} />
-                    {/* Simulate failure button for paid entries */}
-                    {entry.outcome === 'paid' && entry.razorpay_order_id && (
-                      <button
-                        onClick={() => handleSimulateFailure(entry.razorpay_order_id)}
-                        disabled={simulating === entry.razorpay_order_id}
-                        className="absolute top-4 right-16 px-2 py-1 bg-rejected/20 text-rejected text-[10px] rounded font-mono opacity-0 group-hover:opacity-100 transition hover:bg-rejected/30"
-                      >
-                        {simulating === entry.razorpay_order_id ? 'Simulating...' : 'Simulate Failure'}
-                      </button>
-                    )}
-                  </div>
+                ledger.map(entry => (
+                  <FourStateCard
+                    key={entry.id}
+                    entry={entry}
+                    onClick={() => setSelectedEntry(entry)}
+                    onSimulateFailure={handleSimulateFailure}
+                  />
                 ))
               )}
             </div>
           </>
         )}
 
-        {activeTab === 'campaigns' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {campaigns.length === 0 ? (
-              <div className="col-span-full text-center text-gray-500 py-12">
-                No campaigns yet. The orchestrator will propose campaigns automatically.
-              </div>
-            ) : (
-              campaigns.map(campaign => (
-                <CampaignCard
-                  key={campaign.id}
-                  campaign={campaign}
-                  onApprove={handleApprove}
-                  onReject={handleReject}
-                />
-              ))
-            )}
-          </div>
+        {tab === 'campaigns' && (
+          <>
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={handleReviewCampaign}
+                disabled={loading}
+                className="bg-ai-proposed text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition disabled:opacity-50"
+              >
+                {loading ? 'Reviewing...' : 'Run Campaign Review'}
+              </button>
+            </div>
+            <div className="space-y-3">
+              {campaigns.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No campaigns yet. Click "Run Campaign Review" to have the Brain propose one.</p>
+              ) : (
+                campaigns.map(c => (
+                  <CampaignCard
+                    key={c.id}
+                    campaign={c}
+                    onApprove={async () => { await approveCampaign(c.id); refreshCampaigns() }}
+                    onReject={async () => { await rejectCampaign(c.id); refreshCampaigns() }}
+                  />
+                ))
+              )}
+            </div>
+          </>
         )}
 
-        {/* Failure/Recovery Detail Drawer */}
-        {selectedEntry && selectedEntry.razorpay_order_id && (
-          <FailureRecoveryView
-            orderId={selectedEntry.razorpay_order_id}
-            onClose={() => setSelectedEntry(null)}
-          />
-        )}
+        {tab === 'approvals' && <ApprovalPanel />}
       </div>
+
+      {/* Failure/Recovery Detail Drawer */}
+      {selectedEntry && (
+        <FailureRecoveryView
+          entry={selectedEntry}
+          onClose={() => setSelectedEntry(null)}
+          onSimulateFailure={handleSimulateFailure}
+        />
+      )}
     </div>
   )
 }

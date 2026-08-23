@@ -1,132 +1,108 @@
-import React from 'react'
 import FourStateStep from './FourStateStep'
-import { getOutcomeColor, getOutcomeLabel } from '../lib/colors'
 
-/**
- * THE core visual component — the Four-State Timeline Card.
- * Renders a horizontal timeline showing: PROPOSED → POLICY CHECK → GATE → OUTCOME
- *
- * Props:
- *   entry - a ledger entry object from the API
- */
-export default function FourStateCard({ entry }) {
-  if (!entry) return null
+const STEPS = [
+  { key: 'brain', label: 'AI Proposed', icon: '✨' },
+  { key: 'cage', label: 'Policy Check', icon: '⚡' },
+  { key: 'gate', label: 'Order', icon: '📋' },
+  { key: 'payment', label: 'Payment', icon: '💳' },
+]
 
+function getStepStatuses(entry) {
   const outcome = entry.outcome || 'pending'
-  const proposal = entry.proposal_json ? JSON.parse(entry.proposal_json) : {}
-  const finalAction = entry.final_action_json ? JSON.parse(entry.final_action_json) : {}
-  const violations = entry.policy_violations ? JSON.parse(entry.policy_violations) : []
-  const colors = getOutcomeColor(outcome)
+  const decision = entry.policy_decision
+  const hasOrder = !!entry.razorpay_order_id
+  const hasPayment = !!entry.razorpay_payment_id
 
-  // Determine step statuses based on outcome
-  const proposedStatus = 'active'
-  const policyCheckStatus = violations.length > 0 ? 'clamped' : 'completed'
-  const gateStatus = outcome === 'awaiting_approval' ? 'active'
-    : outcome === 'rejected' ? 'failed'
-    : 'completed'
-  const outcomeStatus = outcome === 'paid' || outcome === 'approved' ? 'completed'
-    : outcome === 'failed' || outcome === 'rejected' ? 'failed'
-    : outcome === 'reverted' ? 'failed'
-    : 'pending'
+  return {
+    brain: outcome !== 'pending' ? 'completed' : 'pending',
+    cage: decision === 'approved' ? 'completed'
+        : decision === 'clamped' ? 'clamped'
+        : decision === 'rejected' ? 'rejected'
+        : decision === 'awaiting_approval' ? 'pending'
+        : 'pending',
+    gate: hasOrder ? 'completed' : 'pending',
+    payment: hasPayment ? 'completed'
+           : outcome === 'paid' ? 'completed'
+           : outcome === 'failed' ? 'rejected'
+           : 'pending',
+  }
+}
 
-  // Format amounts
-  const proposedDiscount = proposal.discount_pct ? `${proposal.discount_pct}%` : '—'
-  const finalDiscount = finalAction.discount_pct !== undefined ? `${finalAction.discount_pct}%` : '—'
-  const wasClamped = proposedDiscount !== finalDiscount && finalAction.discount_pct !== undefined
+export default function FourStateCard({ entry, onClick, onSimulateFailure }) {
+  const statuses = getStepStatuses(entry)
+  const outcome = entry.outcome || 'pending'
 
-  // Clamped display: show struck-through original → new value
-  const clampedDisplay = wasClamped
-    ? <span><span className="line-through text-gray-500">{proposedDiscount}</span> → <span className="text-clamped font-bold">{finalDiscount}</span></span>
-    : finalDiscount
+  const outcomeColor = {
+    approved: 'bg-approved',
+    clamped: 'bg-clamped',
+    awaiting_approval: 'bg-clamped',
+    rejected: 'bg-rejected',
+    paid: 'bg-approved',
+    failed: 'bg-rejected',
+    reverted: 'bg-approved',
+    order_created: 'bg-approved',
+    no_campaign: 'bg-gray-600',
+  }[outcome] || 'bg-gray-600'
 
-  // Format timestamp
-  const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString('en-US', { hour12: false }) : ''
+  let proposal = {}
+  let finalAction = {}
+  try { proposal = JSON.parse(entry.proposal_json || '{}') } catch {}
+  try { finalAction = JSON.parse(entry.final_action_json || '{}') } catch {}
 
   return (
-    <div className={`border rounded-lg p-4 mb-3 bg-surface-dark-card border-surface-dark-border hover:border-gray-600 transition`}>
-      {/* Header row */}
+    <div
+      onClick={() => onClick?.(entry)}
+      className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-4 cursor-pointer hover:border-ai-proposed transition"
+    >
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-gray-400">{time}</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${colors.bg} ${colors.text}`}>
-            {getOutcomeLabel(outcome)}
-          </span>
-          {entry.trigger && (
-            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-gray-500 bg-gray-800">
-              {entry.trigger}
-            </span>
+          <span className={`w-2 h-2 rounded-full ${outcomeColor}`}></span>
+          <span className="text-xs font-mono text-gray-500">#{entry.id}</span>
+          <span className="text-xs text-gray-500">{entry.actor} → {entry.trigger}</span>
+        </div>
+        <span className="text-xs text-gray-500">{entry.timestamp}</span>
+      </div>
+
+      {/* Four-State Step Bar */}
+      <div className="flex items-center gap-1 mb-3">
+        {STEPS.map((step, i) => (
+          <FourStateStep
+            key={step.key}
+            icon={step.icon}
+            label={step.label}
+            status={statuses[step.key]}
+          />
+        ))}
+      </div>
+
+      {/* Outcome Badge */}
+      <div className="flex items-center justify-between">
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+          outcome === 'approved' || outcome === 'paid' || outcome === 'order_created' || outcome === 'reverted'
+            ? 'bg-approved-light text-approved'
+            : outcome === 'clamped' || outcome === 'awaiting_approval'
+            ? 'bg-clamped-light text-clamped'
+            : outcome === 'rejected' || outcome === 'failed'
+            ? 'bg-rejected-light text-rejected'
+            : 'bg-gray-800 text-gray-400'
+        }`}>
+          {outcome}
+        </span>
+
+        <div className="flex items-center gap-2">
+          {proposal.discount_pct > 0 && (
+            <span className="text-xs font-mono text-ai-proposed">{proposal.discount_pct}%</span>
+          )}
+          {entry.razorpay_order_id && (
+            <span className="text-xs font-mono text-gray-500">{entry.razorpay_order_id.slice(0, 16)}...</span>
           )}
         </div>
-        {entry.razorpay_order_id && (
-          <span className="font-mono text-[10px] text-gray-500">{entry.razorpay_order_id}</span>
-        )}
       </div>
 
-      {/* Four-state timeline */}
-      <div className="flex items-start justify-between gap-1">
-        {/* PROPOSED */}
-        <FourStateStep
-          label="Proposed"
-          status={proposedStatus}
-          icon="✨"
-          detail={clampedDisplay}
-          subtext={proposal.discount_pct ? `${proposal.discount_pct}%` : ''}
-        />
-
-        {/* Connector */}
-        <div className="step-connector bg-gray-700 self-center mt-5" />
-
-        {/* POLICY CHECK */}
-        <FourStateStep
-          label="Policy Check"
-          status={policyCheckStatus}
-          icon={violations.length > 0 ? '⚡' : '✓'}
-          detail={violations.length > 0 ? violations[0].substring(0, 40) : 'Passed'}
-          subtext={violations.length > 1 ? `+${violations.length - 1} more` : ''}
-        />
-
-        {/* Connector */}
-        <div className="step-connector bg-gray-700 self-center mt-5" />
-
-        {/* GATE */}
-        <FourStateStep
-          label="Gate"
-          status={gateStatus}
-          icon={outcome === 'awaiting_approval' ? '⏳' : outcome === 'rejected' ? '✗' : '✓'}
-          detail={
-            outcome === 'awaiting_approval' ? 'Awaiting approval'
-            : outcome === 'rejected' ? 'Rejected'
-            : 'Auto-approved'
-          }
-          isActive={outcome === 'awaiting_approval'}
-        />
-
-        {/* Connector */}
-        <div className="step-connector bg-gray-700 self-center mt-5" />
-
-        {/* OUTCOME */}
-        <FourStateStep
-          label="Outcome"
-          status={outcomeStatus}
-          icon={outcome === 'paid' ? '✅' : outcome === 'failed' ? '❌' : outcome === 'reverted' ? '↩' : '...'}
-          detail={
-            outcome === 'paid' ? 'Payment captured'
-            : outcome === 'failed' ? 'Payment failed'
-            : outcome === 'reverted' ? 'Reverted to standard'
-            : outcome === 'rejected' ? 'No action'
-            : 'Pending'
-          }
-          subtext={entry.razorpay_payment_id || ''}
-        />
-      </div>
-
-      {/* Reasoning (italic, design-spec §2.3) */}
+      {/* Reasoning (italic) */}
       {entry.reasoning && (
-        <div className="mt-3 pt-3 border-t border-gray-800">
-          <span className="ai-reasoning text-xs leading-relaxed">
-            "{entry.reasoning}"
-          </span>
-        </div>
+        <p className="text-xs italic text-gray-500 mt-2 ai-reasoning line-clamp-2">"{entry.reasoning}"</p>
       )}
     </div>
   )

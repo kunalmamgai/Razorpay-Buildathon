@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
 import Storefront from './pages/Storefront'
 import Dashboard from './pages/Dashboard'
+import ApprovalPanel from './components/ApprovalPanel'
 import './index.css'
 
 function App() {
@@ -16,12 +17,21 @@ function App() {
         <div className="flex gap-4 text-sm">
           <Link to="/" className="text-gray-600 hover:text-ai-proposed transition">Storefront</Link>
           <Link to="/dashboard" className="text-gray-600 hover:text-ai-proposed transition">Dashboard</Link>
+          <Link to="/approvals" className="text-gray-600 hover:text-ai-proposed transition">Approvals</Link>
         </div>
       </nav>
       <main className="pt-14">
         <Routes>
           <Route path="/" element={<Storefront />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/approvals" element={
+            <div className="min-h-screen bg-surface-dark p-8">
+              <div className="max-w-3xl mx-auto">
+                <h1 className="text-2xl font-bold text-white mb-6">Merchant Approvals</h1>
+                <ApprovalPanel />
+              </div>
+            </div>
+          } />
         </Routes>
       </main>
     </BrowserRouter>

@@ -1,74 +1,60 @@
-import React from 'react'
-
 export default function CampaignCard({ campaign, onApprove, onReject }) {
-  const statusColors = {
+  const statusColor = {
     active: 'bg-approved-light text-approved',
     pending: 'bg-clamped-light text-clamped',
-    expired: 'bg-gray-100 text-gray-500',
     rejected: 'bg-rejected-light text-rejected',
-    draft: 'bg-gray-100 text-gray-500',
-  }
+    draft: 'bg-gray-800 text-gray-400',
+  }[campaign.status] || 'bg-gray-800 text-gray-400'
 
-  const status = campaign.status || 'draft'
-  const skus = campaign.target_skus_json ? JSON.parse(campaign.target_skus_json) : []
-
-  // Calculate time remaining
-  let timeRemaining = ''
-  if (campaign.expires_at) {
-    const diff = new Date(campaign.expires_at) - new Date()
-    if (diff > 0) {
-      const hours = Math.floor(diff / 3600000)
-      const mins = Math.floor((diff % 3600000) / 60000)
-      timeRemaining = `${hours}h ${mins}m`
-    } else {
-      timeRemaining = 'Expired'
-    }
-  }
+  let targetSkus = []
+  try { targetSkus = JSON.parse(campaign.target_skus_json || '[]') } catch {}
 
   return (
-    <div className="border rounded-lg p-4 bg-surface-dark-card border-surface-dark-border hover:border-gray-600 transition">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium text-gray-200">{campaign.name}</h3>
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${statusColors[status] || statusColors.draft}`}>
-          {status}
+    <div className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-5">
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-white">{campaign.name}</h3>
+          <p className="text-xs text-gray-500 font-mono mt-1">{campaign.id}</p>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+          {campaign.status}
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 text-xs font-mono mb-3">
+      <div className="grid grid-cols-3 gap-4 mb-3">
         <div>
-          <span className="text-gray-500">Discount: </span>
-          <span className="text-clamped">{campaign.discount_pct}%</span>
+          <p className="text-xs text-gray-500">Discount</p>
+          <p className="text-lg font-bold text-ai-proposed font-mono">{campaign.discount_pct}%</p>
         </div>
         <div>
-          <span className="text-gray-500">Expires: </span>
-          <span className="text-gray-300">{timeRemaining || '—'}</span>
+          <p className="text-xs text-gray-500">Target SKUs</p>
+          <p className="text-sm text-gray-300">{targetSkus.join(', ') || 'None'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-gray-500">Policy Decision</p>
+          <p className="text-sm text-gray-300">{campaign.policy_decision || '—'}</p>
         </div>
       </div>
 
-      <div className="mb-3">
-        <span className="text-[10px] text-gray-500 uppercase">Target SKUs</span>
-        <div className="flex gap-1 mt-1">
-          {skus.map(sku => (
-            <span key={sku} className="px-2 py-0.5 bg-gray-800 text-gray-400 rounded text-[10px] font-mono">
-              {sku}
-            </span>
-          ))}
-        </div>
-      </div>
+      {campaign.starts_at && (
+        <p className="text-xs text-gray-500 mb-3">
+          {campaign.starts_at} → {campaign.expires_at || '—'}
+        </p>
+      )}
 
-      {status === 'pending' && onApprove && onReject && (
-        <div className="flex gap-2 pt-2 border-t border-gray-800">
+      {campaign.status === 'pending' && (
+        <div className="flex gap-3">
           <button
-            onClick={() => onApprove(campaign.id)}
-            className="flex-1 px-3 py-1.5 bg-approved text-white text-xs rounded font-medium hover:opacity-90 transition"
+            onClick={onApprove}
+            className="flex-1 bg-approved text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition"
           >
-            Approve
+            ✓ Approve Campaign
           </button>
           <button
-            onClick={() => onReject(campaign.id)}
-            className="flex-1 px-3 py-1.5 bg-rejected text-white text-xs rounded font-medium hover:opacity-90 transition"
+            onClick={onReject}
+            className="flex-1 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
           >
-            Reject
+            ✕ Reject Campaign
           </button>
         </div>
       )}

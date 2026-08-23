@@ -1,13 +1,15 @@
-"""SQLite database setup and session management."""
-import sqlite3
-import os
-from contextlib import contextmanager
+"""SQLite database — connection management and schema creation.
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "marlin.db")
+Schema is insert-only for ledger (no erasing rejected proposals).
+Every table includes timestamps for auditability.
+"""
+import sqlite3
+from contextlib import contextmanager
+import backend.config as _config
 
 
 def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(_config.DATABASE_URL)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -34,34 +36,57 @@ def init_db():
                 name TEXT NOT NULL,
                 price INTEGER NOT NULL,
                 category TEXT,
-                discountable INTEGER DEFAULT 1
+                discountable INTEGER DEFAULT 1,
+                stock_quantity INTEGER DEFAULT 100
             );
 
             CREATE TABLE IF NOT EXISTS orders (
                 id TEXT PRIMARY KEY,
-                razorpay_order_id TEXT,
+                razorpay_order_id TEXT UNIQUE,
                 razorpay_payment_id TEXT,
                 cart_json TEXT,
-                final_amount INTEGER,
-                original_amount INTEGER,
+                original_amount INTEGER NOT NULL,
+                final_amount INTEGER NOT NULL,
+                offer_id TEXT,
                 status TEXT DEFAULT 'created',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                idempotency_key TEXT,
+                retry_of TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS ledger (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                correlation_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 actor TEXT NOT NULL,
                 trigger TEXT NOT NULL,
                 proposal_json TEXT,
                 reasoning TEXT,
-                policy_passed INTEGER,
-                policy_violations TEXT,
+                policy_decision TEXT,
+                policy_violations_json TEXT,
                 final_action_json TEXT,
+                policy_version TEXT DEFAULT 'policy-v1',
+                approval_status TEXT DEFAULT NULL,
+                approval_actor TEXT DEFAULT NULL,
+                approval_timestamp TIMESTAMP DEFAULT NULL,
                 razorpay_order_id TEXT,
                 razorpay_payment_id TEXT,
-                outcome TEXT DEFAULT 'pending'
+                idempotency_key TEXT,
+                outcome TEXT DEFAULT 'pending',
+                error_code TEXT DEFAULT NULL,
+                error_message TEXT DEFAULT NULL
             );
+
+            CREATE INDEX IF NOT EXISTS idx_ledger_correlation
+                ON ledger(correlation_id);
+            CREATE INDEX IF NOT EXISTS idx_ledger_outcome
+                ON ledger(outcome);
+            CREATE INDEX IF NOT EXISTS idx_ledger_order
+                ON ledger(razorpay_order_id);
+            CREATE INDEX IF NOT EXISTS idx_orders_idempotency
+                ON orders(idempotency_key);
 
             CREATE TABLE IF NOT EXISTS campaigns (
                 id TEXT PRIMARY KEY,
@@ -71,6 +96,9 @@ def init_db():
                 starts_at TIMESTAMP,
                 expires_at TIMESTAMP,
                 status TEXT DEFAULT 'draft',
+                policy_decision TEXT,
+                approval_status TEXT DEFAULT NULL,
+                created_by TEXT DEFAULT 'system',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
             """

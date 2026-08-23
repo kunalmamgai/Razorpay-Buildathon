@@ -14,6 +14,7 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import backend.db as db_module
+import backend.config as config_module
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -22,9 +23,9 @@ def setup_test_db():
     fd, db_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
 
-    # Override the DB path before any imports that cache it
-    original_path = db_module.DB_PATH
-    db_module.DB_PATH = db_path
+    # Override the DB URL before any schema creation
+    original_url = config_module.DATABASE_URL
+    config_module.DATABASE_URL = db_path
 
     # Initialize schema + seed products
     db_module.init_db()
@@ -33,7 +34,7 @@ def setup_test_db():
     yield db_path
 
     # Cleanup
-    db_module.DB_PATH = original_path
+    config_module.DATABASE_URL = original_url
     try:
         os.unlink(db_path)
     except OSError:
@@ -43,18 +44,18 @@ def setup_test_db():
 def _seed_products(db_path: str):
     """Insert the 6 seed products into the test database."""
     products = [
-        ("SKU_101", "Wireless Earbuds Pro", 299900, "Electronics", 1),
-        ("SKU_102", "USB-C Charging Cable (2m)", 49900, "Accessories", 1),
-        ("SKU_103", "Phone Case — MagSafe Compatible", 99900, "Accessories", 1),
-        ("SKU_104", "Portable Power Bank 10000mAh", 149900, "Electronics", 1),
-        ("SKU_105", "Bluetooth Speaker Mini", 199900, "Electronics", 1),
-        ("SKU_106", "Premium Leather Wallet", 129900, "Fashion", 1),
+        ("SKU_101", "Wireless Earbuds Pro", 299900, "Electronics", 1, 150),
+        ("SKU_102", "USB-C Charging Cable (2m)", 49900, "Accessories", 1, 500),
+        ("SKU_103", "Phone Case — MagSafe Compatible", 99900, "Accessories", 1, 200),
+        ("SKU_104", "Portable Power Bank 10000mAh", 149900, "Electronics", 1, 30),
+        ("SKU_105", "Bluetooth Speaker Mini", 199900, "Electronics", 1, 80),
+        ("SKU_106", "Premium Leather Wallet", 129900, "Fashion", 1, 120),
     ]
     import sqlite3
     conn = sqlite3.connect(db_path)
     for p in products:
         conn.execute(
-            "INSERT OR IGNORE INTO products (id, name, price, category, discountable) VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO products (id, name, price, category, discountable, stock_quantity) VALUES (?, ?, ?, ?, ?, ?)",
             p,
         )
     conn.commit()
@@ -75,16 +76,3 @@ def client():
 def db():
     """Direct database access for assertions."""
     return db_module.get_db
-
-
-@pytest.fixture
-def seed_products():
-    """Re-seed products (useful if a test modifies them)."""
-    def _seed():
-        with db_module.get_db() as conn:
-            for pid in ["SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106"]:
-                conn.execute(
-                    "INSERT OR IGNORE INTO products (id, name, price, category, discountable) VALUES (?, ?, ?, ?, ?)",
-                    (pid, f"Product {pid}", 100000, "Test", 1),
-                )
-    return _seed

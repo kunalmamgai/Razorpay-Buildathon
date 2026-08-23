@@ -1,87 +1,74 @@
-"""Razorpay webhook handler — payment status updates."""
-import json
-from fastapi import APIRouter, Request
-from backend.ledger.ledger import log_entry
-from backend.db import get_db
+"""Webhook and payment routes — Razorpay payment verification and simulation."""
+from fastapi import APIRouter, Request, HTTPException
+from backend.models import PaymentVerifyRequest, PaymentSimulateRequest
+from backend.services.payment_service import (
+    verify_and_record_payment, process_webhook, simulate_payment_failure,
+)
 
-router = APIRouter(prefix="/api", tags=["webhook"])
+router = APIRouter(prefix="/api", tags=["payment"])
 
 
-@router.post("/webhook/razorpay")
+@router.post("/payment/verify")
+def payment_verify(req: PaymentVerifyRequest):
+    """Verify a Razorpay payment signature and record the result.
+
+    Does NOT trust the frontend — always verifies server-side.
+    """
+    try:
+        result = verify_and_record_payment(
+            order_id=req.razorpay_order_id,
+            payment_id=req.razorpay_payment_id,
+            signature=req.razorpay_signature,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Payment verification failed: {e}")
+
+    if result["status"] == "rejected":
+        raise HTTPException(status_code=400, detail=result["reason"])
+
+    return result
+
+
+@router.post("/webhooks/razorpay")
 async def razorpay_webhook(request: Request):
     """Handle Razorpay payment status webhook.
 
-    Updates order status in DB and logs to ledger.
+    Idempotent — duplicate webhooks don't create duplicate records.
+    Verifies webhook signature when configured.
     """
+    raw_body = await request.body()
     payload = await request.json()
 
-    # Extract key fields (Razorpay webhook format)
     event = payload.get("event", "")
-    order_id = payload.get("payload", {}).get("order", {}).get("entity", {}).get("id", "")
-    payment_id = payload.get("payload", {}).get("payment", {}).get("entity", {}).get("id", "")
+    signature = request.headers.get("x-razorpay-signature", "")
 
-    if not order_id:
-        return {"status": "ignored", "reason": "no order_id"}
-
-    # Determine outcome from event
-    if "payment.captured" in event or "payment.authorized" in event:
-        outcome = "paid"
-        order_status = "paid"
-    elif "payment.failed" in event:
-        outcome = "failed"
-        order_status = "failed"
-    else:
-        return {"status": "ignored", "reason": f"unhandled event: {event}"}
-
-    # Update order in DB
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE orders SET razorpay_payment_id = ?, status = ? WHERE razorpay_order_id = ?",
-            (payment_id, order_status, order_id),
+    try:
+        result = process_webhook(
+            event=event,
+            payload=payload,
+            raw_body=raw_body,
+            webhook_signature=signature,
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Webhook processing failed: {e}")
 
-    # Log to ledger
-    log_entry(
-        actor="razorpay",
-        trigger="webhook",
-        reasoning=f"Payment {outcome} for order {order_id}",
-        razorpay_order_id=order_id,
-        razorpay_payment_id=payment_id,
-        outcome=outcome,
-    )
-
-    return {"status": "processed", "outcome": outcome}
+    return result
 
 
 @router.post("/simulate/payment-failure")
-def simulate_payment_failure(order_id: str):
+def payment_failure_simulation(order_id: str):
     """Simulate a payment failure for demo purposes.
 
-    Updates the order to failed status and logs the failure.
-    Used for the 'graceful failure handling' demo.
+    1. Marks the order as PAYMENT_FAILED
+    2. Records the failure in the ledger
+    3. Marks the offer as INVALIDATED
+    4. Prevents reuse of the same offer ID
     """
-    with get_db() as conn:
-        conn.execute(
-            "UPDATE orders SET status = 'failed' WHERE razorpay_order_id = ?",
-            (order_id,),
-        )
+    try:
+        result = simulate_payment_failure(order_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Simulation failed: {e}")
 
-    # Log the failure
-    log_entry(
-        actor="razorpay",
-        trigger="webhook",
-        reasoning=f"Simulated payment failure for order {order_id}. Reverted to standard price, no retry with discount.",
-        razorpay_order_id=order_id,
-        outcome="failed",
-    )
-
-    # Also log the recovery
-    log_entry(
-        actor="system",
-        trigger="recovery",
-        reasoning="Payment failed. Agent reverted to standard price. No retry with discount applied.",
-        razorpay_order_id=order_id,
-        outcome="reverted",
-    )
-
-    return {"status": "simulated", "outcome": "failed"}
+    return result
