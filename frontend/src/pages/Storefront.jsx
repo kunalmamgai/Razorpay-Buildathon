@@ -162,4 +162,12 @@ export default function Storefront() {
                 </button>
               </div>
             )}
-            {error
+            {error && (
+              <div className="mt-4 p-3 bg-rejected-light text-rejected text-xs rounded-lg">{error}</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

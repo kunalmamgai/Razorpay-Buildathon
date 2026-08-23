@@ -5,6 +5,12 @@ from backend.ledger.ledger import get_entries, get_entry_by_id, get_stats
 router = APIRouter(prefix="/api", tags=["ledger"])
 
 
+@router.get("/ledger/stats")
+def ledger_stats():
+    """Get aggregate stats for the dashboard stat strip."""
+    return get_stats()
+
+
 @router.get("/ledger")
 def list_ledger(
     limit: int = Query(default=50, le=200),
@@ -25,9 +31,3 @@ def get_ledger_entry(entry_id: int):
     if not entry:
         return {"error": "not found"}, 404
     return entry
-
-
-@router.get("/ledger/stats")
-def ledger_stats():
-    """Get aggregate stats for the dashboard stat strip."""
-    return get_stats()

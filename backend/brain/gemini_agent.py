@@ -7,15 +7,30 @@ import json
 import os
 from typing import Optional
 
-try:
-    from google import genai
-    from google.genai import types
+_client = None
+MODEL = "gemini-2.5-flash"
 
-    client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", ""))
-    MODEL = "gemini-2.5-flash"
-except ImportError:
-    client = None
-    MODEL = None
+
+def _get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("GEMINI_API_KEY", "")
+        if not api_key:
+            return None
+        try:
+            from google import genai
+            _client = genai.Client(api_key=api_key)
+        except (ImportError, Exception):
+            return None
+    return _client
+
+
+def _get_types():
+    try:
+        from google.genai import types
+        return types
+    except ImportError:
+        return None
 
 
 UPSELL_SYSTEM_PROMPT = """You are Marlin, an AI upsell agent for an e-commerce store.
@@ -60,16 +75,18 @@ def propose_upsell(cart: list[dict], catalog: list[dict]) -> dict:
     """
     fallback = {"discount_pct": 0, "skus": [], "reasoning": "No upsell suggestion available."}
 
-    if client is None:
+    gemini_client = _get_client()
+    gemini_types = _get_types()
+    if gemini_client is None or gemini_types is None:
         return fallback
 
     user_msg = f"Cart: {json.dumps(cart)}\nCatalog: {json.dumps(catalog)}"
 
     try:
-        response = client.models.generate_content(
+        response = gemini_client.models.generate_content(
             model=MODEL,
             contents=user_msg,
-            config=types.GenerateContentConfig(
+            config=gemini_types.GenerateContentConfig(
                 system_instruction=UPSELL_SYSTEM_PROMPT,
                 temperature=0.7,
                 max_output_tokens=300,
@@ -105,16 +122,18 @@ def propose_campaign(order_history: list[dict], catalog: list[dict]) -> dict:
         "reasoning": "No campaign suggestion available.",
     }
 
-    if client is None:
+    gemini_client = _get_client()
+    gemini_types = _get_types()
+    if gemini_client is None or gemini_types is None:
         return fallback
 
     user_msg = f"Recent orders: {json.dumps(order_history[-20:])}\nCatalog: {json.dumps(catalog)}"
 
     try:
-        response = client.models.generate_content(
+        response = gemini_client.models.generate_content(
             model=MODEL,
             contents=user_msg,
-            config=types.GenerateContentConfig(
+            config=gemini_types.GenerateContentConfig(
                 system_instruction=CAMPAIGN_SYSTEM_PROMPT,
                 temperature=0.7,
                 max_output_tokens=300,
