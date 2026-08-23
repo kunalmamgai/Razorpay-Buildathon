@@ -48,16 +48,29 @@ def checkout(req: CheckoutRequest):
     discount_amount = int(original_total * discount_pct / 100)
     final_amount = original_total - discount_amount
 
+    # Determine outcome based on the final action after clamping
+    final_skus = policy_result["final_action"].get("skus", [])
+    final_discount = policy_result["final_action"].get("discount_pct", 0)
+
     if not policy_result["passed"]:
-        outcome = "rejected"
-        final_amount = original_total
-        discount_pct = 0
-        discount_amount = 0
+        # There were violations — check if the clamped result is still usable
+        if final_skus and final_discount > 0:
+            # Proposal was clamped but still has valid SKUs and discount
+            if policy_result["needs_human_approval"]:
+                outcome = "awaiting_approval"
+            else:
+                outcome = "clamped"
+        else:
+            # All SKUs filtered out or discount zeroed — truly rejected
+            outcome = "rejected"
+            final_amount = original_total
+            discount_pct = 0
+            discount_amount = 0
     elif policy_result["needs_human_approval"]:
         outcome = "awaiting_approval"
     else:
-        if discount_pct > 0:
-            outcome = "clamped" if any("exceeds" in v for v in policy_result["violations"]) else "approved"
+        if final_discount > 0:
+            outcome = "approved"
         else:
             outcome = "approved"
 
