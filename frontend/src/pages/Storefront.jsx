@@ -1,15 +1,13 @@
 import { useState, useEffect } from 'react'
-import { fetchProducts, proposeCheckout, approveCheckout, createOrder } from '../api'
+import { fetchProducts, proposeCheckout, approveCheckout, createOrder, verifyPayment } from '../api'
 import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
-
-const RAZORPAY_KEY_ID = 'rzp_test_demo' // In production, this comes from the backend
 
 export default function Storefront() {
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [checkoutState, setCheckoutState] = useState(null)
-  // null | 'proposing' | 'proposal_ready' | 'needs_approval' | 'ordering' | 'order_ready' | 'paying' | 'paid' | 'failed'
+  // null | { state: 'proposing' | 'proposal_ready' | 'needs_approval' | 'ordering' | 'order_ready' | 'paid' | 'failed', proposal?, policy_result?, entry_id?, order_id?, ... }
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -33,14 +31,12 @@ export default function Storefront() {
 
   const handleCheckout = async () => {
     if (cart.length === 0) return
-    setCheckoutState('proposing')
+    setCheckoutState({ state: 'proposing' })
     setError(null)
     try {
       const result = await proposeCheckout(cart)
-      setCheckoutState('proposal_ready')
-      if (result.policy_result?.needs_human_approval) {
-        setCheckoutState('needs_approval')
-      }
+      const needsApproval = !!result.policy_result?.needs_human_approval
+      setCheckoutState({ ...result, state: needsApproval ? 'needs_approval' : 'proposal_ready' })
     } catch (e) {
       setError(e.message)
       setCheckoutState(null)
@@ -49,10 +45,10 @@ export default function Storefront() {
 
   const handleApproveAndPay = async () => {
     if (!checkoutState?.entry_id) return
-    setCheckoutState('ordering')
+    setCheckoutState(prev => ({ ...prev, state: 'ordering' }))
     try {
       let orderResult
-      if (checkoutState.needs_approval) {
+      if (checkoutState.state === 'needs_approval') {
         orderResult = await approveCheckout(checkoutState.entry_id)
       } else {
         orderResult = await createOrder(checkoutState.entry_id)
@@ -66,14 +62,34 @@ export default function Storefront() {
     }
   }
 
-  const openRazorpayCheckout = (orderData) => {
-    if (!window.Razorpay) {
-      setError('Razorpay SDK not loaded. In test mode, payment is simulated.')
+  const simulateMockPayment = async (orderData) => {
+    // Test mode without Razorpay keys — settle the mock order server-side
+    try {
+      await verifyPayment(
+        orderData.order_id,
+        `pay_test_sim_${Math.random().toString(36).slice(2, 10)}`,
+        'mock_signature',
+      )
       setCheckoutState(prev => ({ ...prev, state: 'paid' }))
+      setCart([])
+    } catch {
+      setCheckoutState(prev => ({ ...prev, state: 'failed' }))
+    }
+  }
+
+  const openRazorpayCheckout = (orderData) => {
+    const isMockOrder = !orderData.razorpay_key_id || orderData.order_id.startsWith('order_test_')
+    if (isMockOrder || !window.Razorpay) {
+      if (!isMockOrder && !window.Razorpay) {
+        setError('Razorpay SDK not loaded.')
+        setCheckoutState(prev => ({ ...prev, state: 'failed' }))
+        return
+      }
+      simulateMockPayment(orderData)
       return
     }
     const options = {
-      key: RAZORPAY_KEY_ID,
+      key: orderData.razorpay_key_id,
       amount: orderData.final_amount_paise,
       currency: 'INR',
       name: 'Marlin Store',
@@ -81,15 +97,11 @@ export default function Storefront() {
       handler: async (response) => {
         // Payment successful — verify server-side
         try {
-          await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          })
+          await verifyPayment(
+            response.razorpay_order_id,
+            response.razorpay_payment_id,
+            response.razorpay_signature,
+          )
           setCheckoutState(prev => ({ ...prev, state: 'paid' }))
           setCart([])
         } catch {
@@ -201,7 +213,7 @@ export default function Storefront() {
               >
                 Checkout
               </button>
-            ) : checkoutState.policy_result?.needs_human_approval && checkoutState.state !== 'order_ready' ? (
+            ) : checkoutState.state === 'needs_approval' ? (
               <div className="text-center">
                 <p className="text-sm text-clamped font-medium mb-2">⏳ Awaiting Merchant Approval</p>
                 <p className="text-xs text-gray-500 mb-3">This offer requires merchant approval before proceeding.</p>
@@ -232,18 +244,25 @@ export default function Storefront() {
               </div>
             ) : checkoutState.state === 'order_ready' || checkoutState.order_id ? (
               <button
-                onClick={handleApproveAndPay}
+                onClick={() => openRazorpayCheckout(checkoutState)}
                 className="w-full bg-approved text-white py-3 rounded-xl font-medium hover:bg-green-600 transition"
               >
                 Pay {formatCurrency(checkoutState.final_amount_paise || cartTotal)}
               </button>
+            ) : checkoutState.state === 'ordering' ? (
+              <button
+                disabled
+                className="w-full bg-ai-proposed text-white py-3 rounded-xl font-medium opacity-50 cursor-wait"
+              >
+                Creating order...
+              </button>
             ) : (
               <button
                 onClick={handleApproveAndPay}
-                disabled={checkoutState === 'proposing'}
+                disabled={checkoutState?.state === 'proposing'}
                 className="w-full bg-ai-proposed text-white py-3 rounded-xl font-medium hover:bg-blue-600 transition disabled:opacity-50"
               >
-                {checkoutState === 'proposing' ? 'AI is thinking...' : 'Proceed'}
+                {checkoutState?.state === 'proposing' ? 'AI is thinking...' : 'Proceed'}
               </button>
             )}
           </div>

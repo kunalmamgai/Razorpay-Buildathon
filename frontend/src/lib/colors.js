@@ -31,7 +31,7 @@ export function getOutcomeColor(outcome) {
     case 'pending': return COLORS.clamped
     case 'rejected':
     case 'failed':
-    case 'reverted': return COLORS.reJECTED
+    case 'reverted': return COLORS.rejected
     default: return COLORS.ai
   }
 }

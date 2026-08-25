@@ -1,3 +1,5 @@
+import useCountdown from '../hooks/useCountdown'
+
 export default function CampaignCard({ campaign, onApprove, onReject }) {
   const statusColor = {
     active: 'bg-approved-light text-approved',
@@ -8,6 +10,9 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
 
   let targetSkus = []
   try { targetSkus = JSON.parse(campaign.target_skus_json || '[]') } catch {}
+
+  const { hasExpiry, expired, remainingLabel, progressPct } =
+    useCountdown(campaign.expires_at, campaign.starts_at)
 
   return (
     <div className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-5">
@@ -36,10 +41,23 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
         </div>
       </div>
 
-      {campaign.starts_at && (
-        <p className="text-xs text-gray-500 mb-3">
-          {campaign.starts_at} → {campaign.expires_at || '—'}
-        </p>
+      {hasExpiry && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-500">Expires in</span>
+            <span className={`text-xs font-mono font-medium ${expired ? 'text-rejected' : 'text-clamped'}`}>
+              ⏳ {remainingLabel}
+            </span>
+          </div>
+          <div className="h-1.5 w-full bg-surface-dark-border rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-1000 ${
+                expired ? 'bg-rejected' : progressPct > 75 ? 'bg-clamped' : 'bg-approved'
+              }`}
+              style={{ width: `${expired ? 100 : progressPct}%` }}
+            ></div>
+          </div>
+        </div>
       )}
 
       {campaign.status === 'pending' && (

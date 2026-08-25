@@ -1,4 +1,4 @@
-const API_BASE = '/api'
+const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`
 
 async function request(path, options = {}) {
   const res = await fetch(`${API_BASE}${path}`, {
@@ -68,6 +68,7 @@ export const rejectProposal = (ledgerId) =>
 
 // ── Campaigns ─────────────────────────────────────────────
 export const fetchCampaigns = () => request('/campaigns')
+export const fetchCampaignSchedule = () => request('/campaigns/schedule')
 export const createCampaign = (data) =>
   request('/campaigns', { method: 'POST', body: JSON.stringify(data) })
 export const reviewCampaign = () =>

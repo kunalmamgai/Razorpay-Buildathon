@@ -5,6 +5,7 @@ from backend.services.campaign_service import (
     review_and_propose, approve_campaign, reject_campaign,
     list_campaigns, create_manual_campaign,
 )
+from backend.services import scheduler
 
 router = APIRouter(prefix="/api", tags=["campaigns"])
 
@@ -14,9 +15,16 @@ def campaign_review():
     """Trigger the campaign orchestrator: Brain proposes → Cage evaluates."""
     try:
         result = review_and_propose()
+        scheduler.record_manual_review()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Campaign review failed: {e}")
     return result
+
+
+@router.get("/campaigns/schedule")
+def campaign_schedule():
+    """Orchestrator schedule info for the Agent Activity strip."""
+    return scheduler.get_schedule_info()
 
 
 @router.post("/campaigns")

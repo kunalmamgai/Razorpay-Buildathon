@@ -48,6 +48,10 @@ export default function FourStateCard({ entry, onClick, onSimulateFailure }) {
   let finalAction = {}
   try { proposal = JSON.parse(entry.proposal_json || '{}') } catch {}
   try { finalAction = JSON.parse(entry.final_action_json || '{}') } catch {}
+  let violations = []
+  try { violations = JSON.parse(entry.policy_violations_json || '[]') } catch {}
+
+  const violationSummary = violations.length > 0 ? violations.join(' · ') : null
 
   return (
     <div
@@ -91,7 +95,24 @@ export default function FourStateCard({ entry, onClick, onSimulateFailure }) {
         </span>
 
         <div className="flex items-center gap-2">
-          {proposal.discount_pct > 0 && (
+          {statuses.cage === 'clamped' && finalAction.discount_pct !== undefined && (
+            <span
+              className="text-xs font-mono text-clamped cursor-help"
+              title={violationSummary ? `Policy clamped: ${violationSummary}` : 'Values clamped by policy engine'}
+            >
+              <span className="line-through text-gray-500">{proposal.discount_pct}%</span>
+              {' → '}{finalAction.discount_pct}%
+            </span>
+          )}
+          {statuses.cage === 'rejected' && violationSummary && (
+            <span
+              className="text-xs font-mono text-rejected cursor-help"
+              title={`Rejected: ${violationSummary}`}
+            >
+              ⚠ reason
+            </span>
+          )}
+          {proposal.discount_pct > 0 && statuses.cage !== 'clamped' && (
             <span className="text-xs font-mono text-ai-proposed">{proposal.discount_pct}%</span>
           )}
           {entry.razorpay_order_id && (

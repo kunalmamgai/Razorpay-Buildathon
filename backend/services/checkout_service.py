@@ -11,6 +11,7 @@ from typing import Optional
 from backend.db import get_db
 from backend.brain.gemini_agent import propose_upsell
 from backend.cage.policy_engine import evaluate_upsell_proposal, calculate_final_amount
+from backend.config import RAZORPAY_KEY_ID
 from backend.ledger.ledger import log_entry, get_entry_by_id
 from backend.razorpay_client import create_order
 
@@ -22,6 +23,66 @@ def get_catalog() -> list[dict]:
     with get_db() as conn:
         rows = conn.execute("SELECT * FROM products").fetchall()
         return [dict(row) for row in rows]
+
+
+def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
+    """Restore the amount snapshot persisted at proposal time.
+
+    The order total MUST match exactly what the shopper was shown when the
+    proposal was made — it is never recomputed from SKUs after the fact.
+    """
+    raw = entry.get("amounts_json")
+    if raw:
+        try:
+            snap = json.loads(raw)
+            if snap.get("original_amount_paise") is not None and \
+               snap.get("final_amount_paise") is not None:
+                return {
+                    "original_total": snap["original_amount_paise"],
+                    "final_amount": snap["final_amount_paise"],
+                    "discount_amount": snap.get("discount_amount_paise", 0),
+                    "discount_pct": snap.get("discount_pct", 0),
+                }
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Legacy fallback for entries created before snapshots existed
+    catalog = get_catalog()
+    catalog_map = {p["id"]: p for p in catalog}
+    original_total = 0
+    for sku in final_action.get("skus", []):
+        product = catalog_map.get(sku)
+        if product:
+            original_total += product["price"]
+    if original_total == 0:
+        original_total = 100000  # ₹1,000 fallback
+
+    discount_pct = final_action.get("discount_pct", 0)
+    discount_amount = int(original_total * discount_pct / 100)
+    final_amount = original_total - discount_amount
+    if final_amount <= 0:
+        final_amount = original_total
+        discount_amount = 0
+        discount_pct = 0
+    return {
+        "original_total": original_total,
+        "final_amount": final_amount,
+        "discount_amount": discount_amount,
+        "discount_pct": discount_pct,
+    }
+
+
+def _ensure_offer_not_invalidated(offer_id: str) -> None:
+    """Reject checkout if this offer was already used by a failed payment."""
+    with get_db() as conn:
+        existing = conn.execute(
+            "SELECT status FROM orders WHERE offer_id = ?", (offer_id,)
+        ).fetchone()
+        if existing and dict(existing)["status"] == "payment_failed":
+            raise ValueError(
+                f"Offer {offer_id} was invalidated after payment failure. "
+                "Please create a new checkout."
+            )
 
 
 def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> dict:
@@ -68,7 +129,7 @@ def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> di
     # Determine outcome
     decision = policy_result["decision"]
 
-    # Log the proposal to ledger
+    # Log the proposal to ledger (with the authoritative amount snapshot)
     entry_id = log_entry(
         correlation_id=correlation_id,
         event_type="checkout_proposal",
@@ -79,6 +140,7 @@ def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> di
         policy_result=policy_result,
         idempotency_key=idempotency_key,
         outcome=decision,
+        amounts=amounts,
     )
 
     return {
@@ -121,42 +183,18 @@ def approve_checkout(ledger_id: int) -> dict:
     proposal = json.loads(entry["proposal_json"]) if entry["proposal_json"] else {}
     correlation_id = entry["correlation_id"]
 
-    # Rebuild cart from proposal SKUs (for amount calculation)
-    # We need to look up prices from catalog
-    catalog = get_catalog()
-    catalog_map = {p["id"]: p for p in catalog}
-
+    # Amounts come from the snapshot taken at proposal time — identical to
+    # what the shopper was shown. Never recomputed here.
+    resolved = _amounts_from_snapshot(entry, final_action)
+    original_total = resolved["original_total"]
+    final_amount = resolved["final_amount"]
+    discount_amount = resolved["discount_amount"]
+    discount_pct = resolved["discount_pct"]
     cart_skus = final_action.get("skus", proposal.get("skus", []))
-    discount_pct = final_action.get("discount_pct", 0)
-
-    # Calculate amount from catalog prices
-    original_total = 0
-    for sku in cart_skus:
-        product = catalog_map.get(sku)
-        if product:
-            original_total += product["price"]  # 1 unit each for simplicity
-    # If no SKU prices, use a fallback from the original proposal
-    if original_total == 0:
-        original_total = 100000  # ₹1,000 fallback
-
-    discount_amount = int(original_total * discount_pct / 100)
-    final_amount = original_total - discount_amount
-    if final_amount <= 0:
-        final_amount = original_total
-        discount_amount = 0
-        discount_pct = 0
 
     # Check for reused invalidated offers
     offer_id = f"offer_{correlation_id}"
-    with get_db() as conn:
-        existing = conn.execute(
-            "SELECT status FROM orders WHERE offer_id = ?", (offer_id,)
-        ).fetchone()
-        if existing and dict(existing)["status"] == "payment_failed":
-            raise ValueError(
-                f"Offer {offer_id} was invalidated after payment failure. "
-                "Please create a new checkout."
-            )
+    _ensure_offer_not_invalidated(offer_id)
 
     # Create Razorpay order
     idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
@@ -208,7 +246,7 @@ def approve_checkout(ledger_id: int) -> dict:
         "entry_id": ledger_id,
         "correlation_id": correlation_id,
         "order_id": order_data["id"],
-        "razorpay_key_id": order_data.get("id", "")[:3] if not order_data["id"].startswith("order_test_") else "rzp_test_demo",
+        "razorpay_key_id": RAZORPAY_KEY_ID or None,
         "final_amount_paise": final_amount,
         "discount_pct": discount_pct,
     }
@@ -234,28 +272,16 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
     final_action = json.loads(entry["final_action_json"]) if entry["final_action_json"] else {}
     proposal = json.loads(entry["proposal_json"]) if entry["proposal_json"] else {}
 
-    catalog = get_catalog()
-    catalog_map = {p["id"]: p for p in catalog}
-
+    # Amounts come from the snapshot taken at proposal time — identical to
+    # what the shopper was shown. Never recomputed here.
+    resolved = _amounts_from_snapshot(entry, final_action)
+    original_total = resolved["original_total"]
+    final_amount = resolved["final_amount"]
+    discount_pct = resolved["discount_pct"]
     cart_skus = final_action.get("skus", proposal.get("skus", []))
-    discount_pct = final_action.get("discount_pct", 0)
-
-    original_total = 0
-    for sku in cart_skus:
-        product = catalog_map.get(sku)
-        if product:
-            original_total += product["price"]
-    if original_total == 0:
-        original_total = 100000
-
-    discount_amount = int(original_total * discount_pct / 100)
-    final_amount = original_total - discount_amount
-    if final_amount <= 0:
-        final_amount = original_total
-        discount_amount = 0
-        discount_pct = 0
 
     offer_id = f"offer_{correlation_id}"
+    _ensure_offer_not_invalidated(offer_id)
     if idempotency_key is None:
         idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
 
@@ -305,7 +331,7 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
         "entry_id": ledger_id,
         "correlation_id": correlation_id,
         "order_id": order_data["id"],
-        "razorpay_key_id": "rzp_test_demo",
+        "razorpay_key_id": RAZORPAY_KEY_ID or None,
         "final_amount_paise": final_amount,
         "discount_pct": discount_pct,
     }

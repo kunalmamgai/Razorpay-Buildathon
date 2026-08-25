@@ -25,6 +25,7 @@ def log_entry(
     error_code: str | None = None,
     error_message: str | None = None,
     approval_status: str | None = None,
+    amounts: dict | None = None,
 ) -> int:
     """Write a single ledger entry and return its ID."""
     violations = []
@@ -46,8 +47,8 @@ def log_entry(
                 policy_violations_json, final_action_json, policy_version,
                 razorpay_order_id, razorpay_payment_id,
                 idempotency_key, outcome, error_code, error_message,
-                approval_status)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                approval_status, amounts_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 correlation_id,
                 event_type,
@@ -66,6 +67,7 @@ def log_entry(
                 error_code,
                 error_message,
                 approval_status,
+                json.dumps(amounts) if amounts else None,
             ),
         )
         return cursor.lastrowid

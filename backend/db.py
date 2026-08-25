@@ -76,7 +76,8 @@ def init_db():
                 idempotency_key TEXT,
                 outcome TEXT DEFAULT 'pending',
                 error_code TEXT DEFAULT NULL,
-                error_message TEXT DEFAULT NULL
+                error_message TEXT DEFAULT NULL,
+                amounts_json TEXT DEFAULT NULL
             );
 
             CREATE INDEX IF NOT EXISTS idx_ledger_correlation
@@ -103,3 +104,8 @@ def init_db():
             );
             """
         )
+    # Lightweight migration for pre-existing databases
+    with get_db() as conn:
+        cols = [row[1] for row in conn.execute("PRAGMA table_info(ledger)").fetchall()]
+        if "amounts_json" not in cols:
+            conn.execute("ALTER TABLE ledger ADD COLUMN amounts_json TEXT DEFAULT NULL")

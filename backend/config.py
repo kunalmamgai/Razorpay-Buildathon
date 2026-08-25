@@ -30,6 +30,11 @@ AUTO_APPROVE_THRESHOLD_PCT = 15
 MAX_CAMPAIGN_DISCOUNT_PCT = 25
 MAX_CAMPAIGN_DURATION_HOURS = 48
 
+# ── Orchestrator ───────────────────────────────────────────────────────
+CAMPAIGN_REVIEW_INTERVAL_MINUTES = int(
+    os.getenv("CAMPAIGN_REVIEW_INTERVAL_MINUTES", "60")
+)
+
 # All seed products are discountable (per hackathon spec: SKU_101 & SKU_102
 # explicitly, but we allow all 6 for demo purposes)
 DISCOUNTABLE_SKUS = {"SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106"}

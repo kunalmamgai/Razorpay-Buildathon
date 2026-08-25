@@ -19,12 +19,19 @@ logger = logging.getLogger("marlin")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Initialize DB and seed data on startup."""
+    """Initialize DB, seed data, start the orchestrator scheduler."""
     logger.info("Initializing database...")
     init_db()
     seed()
     logger.info("Database ready.")
+
+    from backend.services.scheduler import start_scheduler
+    if start_scheduler():
+        logger.info("Campaign orchestrator scheduler running.")
     yield
+
+    from backend.services.scheduler import stop_scheduler
+    stop_scheduler()
     logger.info("Shutting down.")
 
 
