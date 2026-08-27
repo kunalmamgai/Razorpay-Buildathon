@@ -228,6 +228,16 @@ export default function Dashboard() {
           onSimulateFailure={handleSimulateFailure}
         />
       )}
+
+      {/* Footer */}
+      <footer className="border-t border-dusk-border mt-8 py-6 px-6 text-center">
+        <p className="text-[11px] text-gray-500">
+          <strong className="text-gray-400">Why this is hard:</strong> India processes billions of UPI transactions annually with near-zero latency.
+          Marlin demonstrates that agentic AI commerce is possible when every proposal passes through deterministic safety bounds,
+          a human gate for high-value decisions, and an immutable audit trail &mdash; all before money moves.
+        </p>
+        <p className="text-[10px] text-gray-600 mt-2">Marlin Growth Agent &middot; Razorpay AI Commerce Hackathon</p>
+      </footer>
     </div>
   )
 }

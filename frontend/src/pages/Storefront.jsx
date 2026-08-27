@@ -1,25 +1,36 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import {
-  ShoppingBag, Sparkles, Trash2, Plus, Minus, CloudSun,
-  ShieldCheck, Package, Zap, ArrowRight, Loader2,
+  ShoppingBag, Trash2, Plus, Minus,
+  ShieldCheck, Zap, ArrowRight, Loader2, Info, X,
+  BrainCircuit, ShieldAlert, BookOpen,
 } from 'lucide-react'
 import { fetchProducts, proposeCheckout, approveCheckout, createOrder, verifyPayment } from '../api'
 import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
 
 const CATEGORY_TINTS = {
-  Electronics: 'bg-sky-100 text-sky-600',
-  Accessories: 'bg-pink-100 text-pink-600',
-  Fashion: 'bg-purple-100 text-purple-600',
+  Electronics: 'bg-sky-50 text-sky-600 border-sky-200',
+  Accessories: 'bg-pink-50 text-pink-600 border-pink-200',
+  Fashion: 'bg-purple-50 text-purple-600 border-purple-200',
 }
+
+const EXPLAINER_STEPS = [
+  { icon: BrainCircuit, title: 'Brain', desc: 'The AI proposes a bundle discount based on your cart and order history.', color: 'text-blue-500 bg-blue-50 border-blue-200' },
+  { icon: ShieldAlert, title: 'Cage', desc: 'A deterministic rules engine caps, approves, or rejects the proposal. No LLM, no ambiguity.', color: 'text-amber-500 bg-amber-50 border-amber-200' },
+  { icon: ShieldCheck, title: 'Gate', desc: 'Discounts above 15% require explicit human approval before an order is created.', color: 'text-emerald-500 bg-emerald-50 border-emerald-200' },
+  { icon: BookOpen, title: 'Ledger', desc: 'Every decision, including rejections, is immutably logged to a public audit trail.', color: 'text-purple-500 bg-purple-50 border-purple-200' },
+]
 
 export default function Storefront() {
   const [products, setProducts] = useState([])
   const [cart, setCart] = useState([])
   const [checkoutState, setCheckoutState] = useState(null)
-  // null | { state: 'proposing' | 'proposal_ready' | 'needs_approval' | 'ordering' | 'order_ready' | 'paid' | 'failed', proposal?, policy_result?, entry_id?, order_id?, ... }
   const [error, setError] = useState(null)
   const [category, setCategory] = useState('All')
+  const [showExplainer, setShowExplainer] = useState(() => {
+    try { return !sessionStorage.getItem('explainerDismissed') } catch { return true }
+  })
 
   useEffect(() => {
     fetchProducts().then(d => setProducts(d.products)).catch(e => setError(e.message))
@@ -77,7 +88,6 @@ export default function Storefront() {
         orderResult = await createOrder(checkoutState.entry_id)
       }
       setCheckoutState(prev => ({ ...prev, ...orderResult, order_id: orderResult.order_id, state: 'order_ready' }))
-      // Open Razorpay checkout
       openRazorpayCheckout(orderResult)
     } catch (e) {
       setError(e.message)
@@ -86,7 +96,6 @@ export default function Storefront() {
   }
 
   const simulateMockPayment = async (orderData) => {
-    // Test mode without Razorpay keys — settle the mock order server-side
     try {
       await verifyPayment(
         orderData.order_id,
@@ -118,7 +127,6 @@ export default function Storefront() {
       name: 'Marlin Store',
       order_id: orderData.order_id,
       handler: async (response) => {
-        // Payment successful — verify server-side
         try {
           await verifyPayment(
             response.razorpay_order_id,
@@ -132,7 +140,7 @@ export default function Storefront() {
         }
       },
       prefill: { name: 'Demo Customer', email: 'demo@marlin.ai' },
-      theme: { color: '#EC4899' },
+      theme: { color: '#3B82F6' },
       modal: {
         ondismiss: () => {
           setCheckoutState(prev => ({ ...prev, state: null }))
@@ -148,27 +156,33 @@ export default function Storefront() {
     return sum + (product ? product.price * item.quantity : 0)
   }, 0)
 
+  const dismissExplainer = () => {
+    setShowExplainer(false)
+    try { sessionStorage.setItem('explainerDismissed', '1') } catch {}
+  }
+
   return (
-    <div className="candy-sky-bg">
+    <div className="min-h-screen bg-white">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 glass-card border-b border-pink-100/70">
+      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 rounded-xl bg-candy-btn flex items-center justify-center shadow-candy">
-              <CloudSun className="w-5 h-5 text-white" />
-            </span>
-            <div>
-              <p className="font-bold text-gray-800 leading-tight">Marlin</p>
-              <p className="text-[10px] text-gray-400 leading-tight">cotton candy commerce</p>
-            </div>
+          <div className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                <ShieldCheck className="w-4 h-4 text-white" />
+              </span>
+              <span className="font-bold text-gray-900">Marlin</span>
+            </Link>
+            <span className="text-gray-300">|</span>
+            <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-900 transition">Dashboard</Link>
           </div>
-          <div className="flex items-center gap-3 text-xs text-gray-400">
-            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 border border-purple-100">
-              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+          <div className="flex items-center gap-3">
+            <span className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400">
+              <ShieldCheck className="w-3.5 h-3.5" />
               Every AI offer audited
             </span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/60 border border-pink-100 font-medium text-gray-600">
-              <ShoppingBag className="w-4 h-4 text-pink-400" />
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-700">
+              <ShoppingBag className="w-4 h-4" />
               {cart.length}
             </span>
           </div>
@@ -176,12 +190,42 @@ export default function Storefront() {
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* Onboarding Explainer */}
+        {showExplainer && (
+          <div className="mb-8 border border-blue-200 bg-blue-50/50 rounded-xl p-5 relative">
+            <button onClick={dismissExplainer} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 transition">
+              <X className="w-4 h-4" />
+            </button>
+            <div className="flex items-center gap-2 mb-3">
+              <Info className="w-4 h-4 text-blue-500" />
+              <h3 className="text-sm font-semibold text-gray-800">How Marlin works</h3>
+            </div>
+            <p className="text-xs text-gray-500 mb-4 max-w-2xl">
+              Every discount you see goes through four layers before money moves. The AI proposes, a rules engine enforces limits,
+              a human gate approves high-value decisions, and every step is immutably logged.
+            </p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {EXPLAINER_STEPS.map((step) => (
+                <div key={step.title} className={`rounded-lg border p-3 ${step.color}`}>
+                  <step.icon className="w-4 h-4 mb-1.5" />
+                  <p className="text-xs font-semibold">{step.title}</p>
+                  <p className="text-[10px] opacity-75 mt-0.5 leading-relaxed">{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Hero */}
         <div className="mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold sunrise-text">Shop under cotton candy skies</h1>
-          <p className="text-gray-500 mt-2 max-w-xl flex items-start gap-2">
-            <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-pink-400" />
-            Add items to your cart — an AI growth agent may suggest a bundle. Every discount it proposes is checked by a rules engine and logged to a public audit trail.
+          <h1 className="text-3xl md:text-4xl font-bold text-gray-900">Shop under Marlin</h1>
+          <p className="text-gray-500 mt-2 max-w-xl text-sm">
+            Add items to your cart &mdash; an AI growth agent may suggest a bundle. Every discount it proposes
+            is checked by a rules engine and logged to a public audit trail.
+            {' '}
+            <Link to="/dashboard" className="text-blue-500 hover:text-blue-600 underline underline-offset-2">
+              See the audit trail &rarr;
+            </Link>
           </p>
         </div>
 
@@ -191,10 +235,10 @@ export default function Storefront() {
             <button
               key={c}
               onClick={() => setCategory(c)}
-              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition border ${
                 category === c
-                  ? 'bg-candy-btn text-white shadow-candy'
-                  : 'bg-white/70 text-gray-500 hover:text-gray-800 border border-pink-100 hover:border-pink-200'
+                  ? 'bg-gray-900 text-white border-gray-900'
+                  : 'bg-white text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-400'
               }`}
             >
               {c}
@@ -204,36 +248,35 @@ export default function Storefront() {
 
         {/* Product Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {products.map(product => (
+          {visibleProducts.map(product => (
             <div
               key={product.id}
-              className="glass-card rounded-2xl overflow-hidden hover:shadow-candy-lg hover:-translate-y-1 transition-all duration-300 group"
+              className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 group"
             >
-              <div className="relative h-44 bg-candy-soft overflow-hidden">
+              <div className="relative h-44 bg-gray-100 overflow-hidden">
                 <img
                   src={`/products/${product.id}.jpg`}
                   alt={product.name}
                   loading="lazy"
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 />
-                <span className={`absolute top-3 left-3 text-[11px] font-medium px-2.5 py-1 rounded-full backdrop-blur ${CATEGORY_TINTS[product.category] || 'bg-white/80 text-gray-500'}`}>
+                <span className={`absolute top-3 left-3 text-[11px] font-medium px-2.5 py-1 rounded-md border backdrop-blur-sm ${CATEGORY_TINTS[product.category] || 'bg-gray-50 text-gray-500 border-gray-200'}`}>
                   {product.category}
                 </span>
                 {product.stock_quantity <= 30 && (
-                  <span className="absolute top-3 right-3 text-[11px] font-medium px-2.5 py-1 rounded-full bg-white/85 text-pink-600 backdrop-blur flex items-center gap-1">
+                  <span className="absolute top-3 right-3 text-[11px] font-medium px-2.5 py-1 rounded-md bg-amber-50 text-amber-700 border border-amber-200 backdrop-blur-sm flex items-center gap-1">
                     <Zap className="w-3 h-3" /> Only {product.stock_quantity} left
                   </span>
                 )}
               </div>
-
               <div className="p-5">
                 <h3 className="font-semibold text-gray-800">{product.name}</h3>
                 <p className="text-xs text-gray-400 font-mono mt-0.5">{product.id}</p>
                 <div className="flex items-center justify-between mt-4">
-                  <span className="text-xl font-bold text-gray-800">{formatCurrency(product.price)}</span>
+                  <span className="text-xl font-bold text-gray-900">{formatCurrency(product.price)}</span>
                   <button
                     onClick={() => addToCart(product.id)}
-                    className="flex items-center gap-1.5 bg-candy-btn text-white px-4 py-2 rounded-xl text-sm font-medium shadow-candy hover:opacity-90 hover:shadow-glow transition"
+                    className="flex items-center gap-1.5 bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition"
                   >
                     <Plus className="w-4 h-4" /> Add
                   </button>
@@ -245,43 +288,43 @@ export default function Storefront() {
 
         {/* Cart Drawer */}
         {cart.length > 0 && (
-          <div className="fixed bottom-0 right-0 w-full md:w-96 glass-card border-t md:border-t-0 md:border-l border-pink-100 shadow-candy-lg z-40 p-6 rounded-t-2xl md:rounded-none md:rounded-l-2xl md:max-h-[92vh] md:overflow-y-auto">
+          <div className="fixed bottom-0 right-0 w-full md:w-96 bg-white border-t md:border-t-0 md:border-l border-gray-200 shadow-2xl z-40 p-6 rounded-t-xl md:rounded-none md:rounded-l-xl md:max-h-[92vh] md:overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5 text-pink-400" />
+              <ShoppingBag className="w-5 h-5 text-gray-400" />
               Cart ({cart.length})
             </h2>
             <div className="space-y-3 mb-4 max-h-56 overflow-y-auto pr-1">
               {cart.map(item => {
                 const product = products.find(p => p.id === item.sku)
                 return (
-                  <div key={item.sku} className="flex items-center gap-3 bg-white/70 border border-pink-50 rounded-xl p-2.5">
+                  <div key={item.sku} className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-lg p-2.5">
                     <img
                       src={`/products/${item.sku}.jpg`}
                       alt={product?.name || item.sku}
                       loading="lazy"
-                      className="w-12 h-12 rounded-lg object-cover bg-candy-soft"
+                      className="w-12 h-12 rounded-lg object-cover bg-gray-100"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-700 truncate">{product?.name || item.sku}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <button onClick={() => changeQty(item.sku, -1)} className="w-5 h-5 rounded-md bg-pink-50 text-gray-500 hover:bg-pink-100 flex items-center justify-center">
+                        <button onClick={() => changeQty(item.sku, -1)} className="w-5 h-5 rounded-md bg-gray-200 text-gray-500 hover:bg-gray-300 flex items-center justify-center">
                           <Minus className="w-3 h-3" />
                         </button>
                         <span className="text-xs font-mono w-4 text-center">{item.quantity}</span>
-                        <button onClick={() => changeQty(item.sku, 1)} className="w-5 h-5 rounded-md bg-pink-50 text-gray-500 hover:bg-pink-100 flex items-center justify-center">
+                        <button onClick={() => changeQty(item.sku, 1)} className="w-5 h-5 rounded-md bg-gray-200 text-gray-500 hover:bg-gray-300 flex items-center justify-center">
                           <Plus className="w-3 h-3" />
                         </button>
                       </div>
                     </div>
                     <span className="text-sm font-mono text-gray-600">{formatCurrency((product?.price || 0) * item.quantity)}</span>
-                    <button onClick={() => removeFromCart(item.sku)} className="text-pink-300 hover:text-red-500 transition">
+                    <button onClick={() => removeFromCart(item.sku)} className="text-gray-300 hover:text-red-500 transition">
                       <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 )
               })}
             </div>
-            <div className="border-t border-pink-100 pt-3 mb-4">
+            <div className="border-t border-gray-200 pt-3 mb-4">
               <div className="flex justify-between font-bold text-gray-800">
                 <span>Subtotal</span>
                 <span className="font-mono">{formatCurrency(cartTotal)}</span>
@@ -302,45 +345,58 @@ export default function Storefront() {
 
             {/* Error */}
             {error && (
-              <div className="bg-rejected-light text-rejected px-3 py-2 rounded-lg text-sm mb-3">{error}</div>
+              <div className="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg text-sm mb-3">{error}</div>
             )}
 
             {/* Checkout Button */}
             {!checkoutState || checkoutState.state === null ? (
               <button
                 onClick={handleCheckout}
-                disabled={checkoutState?.state === 'ordering'}
-                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition"
+                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition"
               >
                 Checkout <ArrowRight className="w-4 h-4" />
               </button>
             ) : checkoutState.state === 'needs_approval' ? (
               <div className="text-center">
-                <p className="text-sm text-clamped font-medium mb-2 flex items-center justify-center gap-1.5">
-                  <Package className="w-4 h-4 pulse-active" /> Awaiting Merchant Approval
+                <p className="text-sm text-amber-600 font-medium mb-2 flex items-center justify-center gap-1.5">
+                  <ShieldCheck className="w-4 h-4 pulse-active" /> Awaiting Merchant Approval
                 </p>
-                <p className="text-xs text-gray-500 mb-3">This offer is above the auto-approve threshold — a human must sign off first.</p>
+                <p className="text-xs text-gray-500 mb-3">This offer exceeds the auto-approve threshold &mdash; a human must sign off.</p>
                 <button
                   disabled
-                  className="w-full bg-gray-200 text-gray-400 py-3 rounded-xl font-medium cursor-not-allowed"
+                  className="w-full bg-gray-200 text-gray-400 py-3 rounded-lg font-medium cursor-not-allowed"
                 >
                   Waiting for Approval...
                 </button>
               </div>
             ) : checkoutState.state === 'paid' ? (
-              <div className="text-center bg-approved-light text-approved p-4 rounded-xl">
-                <p className="font-bold">✅ Payment Successful!</p>
-                <p className="text-sm mt-1">Thank you for your purchase.</p>
+              <div className="space-y-3">
+                <div className="text-center bg-emerald-50 text-emerald-700 border border-emerald-200 p-4 rounded-lg">
+                  <p className="font-bold">Payment Successful</p>
+                  <p className="text-sm mt-1">Thank you for your purchase.</p>
+                </div>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center justify-center gap-2 w-full bg-blue-50 text-blue-600 border border-blue-200 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-100 transition"
+                >
+                  View this decision in the audit trail <ArrowRight className="w-4 h-4" />
+                </Link>
               </div>
             ) : checkoutState.state === 'failed' ? (
-              <div className="text-center">
-                <div className="bg-rejected-light text-rejected p-3 rounded-xl mb-3">
-                  <p className="font-bold">❌ Payment Failed</p>
+              <div className="space-y-3">
+                <div className="bg-red-50 text-red-600 border border-red-200 p-3 rounded-lg">
+                  <p className="font-bold">Payment Failed</p>
                   <p className="text-sm mt-1">The offer has been invalidated. Please try again.</p>
                 </div>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center justify-center gap-2 w-full bg-blue-50 text-blue-600 border border-blue-200 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-100 transition"
+                >
+                  View this decision in the audit trail <ArrowRight className="w-4 h-4" />
+                </Link>
                 <button
                   onClick={() => { setCheckoutState(null); setError(null) }}
-                  className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition"
+                  className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition"
                 >
                   Try Again <ArrowRight className="w-4 h-4" />
                 </button>
@@ -348,14 +404,14 @@ export default function Storefront() {
             ) : checkoutState.state === 'ordering' ? (
               <button
                 disabled
-                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium opacity-70 cursor-wait"
+                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3 rounded-lg font-medium opacity-70 cursor-wait"
               >
                 <Loader2 className="w-4 h-4 animate-spin" /> Creating order...
               </button>
             ) : checkoutState.state === 'order_ready' || checkoutState.order_id ? (
               <button
                 onClick={() => openRazorpayCheckout(checkoutState)}
-                className="w-full bg-approved text-white py-3 rounded-xl font-medium hover:bg-green-600 transition"
+                className="w-full bg-emerald-600 text-white py-3 rounded-lg font-medium hover:bg-emerald-700 transition"
               >
                 Pay {formatCurrency(checkoutState.final_amount_paise || cartTotal)}
               </button>
@@ -363,7 +419,7 @@ export default function Storefront() {
               <button
                 onClick={handleApproveAndPay}
                 disabled={checkoutState?.state === 'proposing'}
-                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-gray-900 text-white py-3 rounded-lg font-medium hover:bg-gray-800 transition disabled:opacity-50"
               >
                 {checkoutState?.state === 'proposing'
                   ? (<><Loader2 className="w-4 h-4 animate-spin" /> AI is thinking...</>)
@@ -373,6 +429,23 @@ export default function Storefront() {
           </div>
         )}
       </div>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200 bg-gray-50 mt-16">
+        <div className="max-w-6xl mx-auto px-6 py-8">
+          <p className="text-xs text-gray-400 leading-relaxed max-w-3xl">
+            <strong className="text-gray-500">Why this matters:</strong> In India's UPI ecosystem, real-time payments
+            move billions of dollars with near-zero friction &mdash; but merchant growth tools haven't kept pace.
+            Marlin demonstrates how an AI agent can continuously propose revenue strategies (bundles, campaigns)
+            while staying within deterministic safety bounds: no unchecked discounts, no opaque decisions,
+            every action auditable. This is the control infrastructure that makes agentic commerce trustworthy
+            enough for production payments.
+          </p>
+          <p className="text-[10px] text-gray-300 mt-4">
+            Marlin Growth Agent &middot; Built for the Razorpay AI Commerce Hackathon
+          </p>
+        </div>
+      </footer>
     </div>
   )
 }

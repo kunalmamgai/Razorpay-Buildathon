@@ -1,10 +1,17 @@
-import { Sparkles, Zap, Receipt, CreditCard, Check, ChevronRight } from 'lucide-react'
+import { Sparkles, Zap, Receipt, CreditCard, Check } from 'lucide-react'
 
 export const STEP_ICONS = {
   brain: Sparkles,
   cage: Zap,
   gate: Receipt,
   payment: CreditCard,
+}
+
+export const STEP_DESCRIPTIONS = {
+  brain: 'Brain: What the AI proposed',
+  cage: 'Cage: What the rules engine did',
+  gate: 'Gate: Whether a human approved it',
+  payment: 'Payment: The final money movement',
 }
 
 const STATUS_STYLES = {
@@ -16,8 +23,9 @@ const STATUS_STYLES = {
 
 export default function FourStateStep({ icon, label, status }) {
   const Icon = typeof icon === 'string' ? (STEP_ICONS[icon] || Sparkles) : icon
+  const tooltip = typeof icon === 'string' ? (STEP_DESCRIPTIONS[icon] || label) : label
   return (
-    <div className="flex items-center flex-1">
+    <div className="flex items-center flex-1" title={tooltip}>
       <div className="flex flex-col items-center flex-1">
         <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${STATUS_STYLES[status] || STATUS_STYLES.pending} ${status === 'pending' ? 'pulse-active' : ''}`}>
           {status === 'completed'

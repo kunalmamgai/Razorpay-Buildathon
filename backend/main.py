@@ -12,6 +12,7 @@ from backend.config import (
     validate_config, 
     get_config_summary, 
     APP_ENV,
+    IS_PRODUCTION,
     LOG_LEVEL,
     LOG_FORMAT
 )
