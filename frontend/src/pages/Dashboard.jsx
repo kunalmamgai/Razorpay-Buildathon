@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { RefreshCw, Radio } from 'lucide-react'
 import { fetchLedger, fetchLedgerStats, fetchCampaigns, reviewCampaign, approveCampaign, rejectCampaign, simulatePaymentFailure } from '../api'
 import StatStrip from '../components/StatStrip'
 import FilterBar from '../components/FilterBar'
@@ -7,6 +8,7 @@ import FailureRecoveryView from '../components/FailureRecoveryView'
 import ApprovalPanel from '../components/ApprovalPanel'
 import CampaignCard from '../components/CampaignCard'
 import AgentActivityStrip from '../components/AgentActivityStrip'
+import ColorLegend from '../components/ColorLegend'
 
 const LEDGER_POLL_MS = 5000
 
@@ -101,33 +103,36 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-surface-dark text-white">
+    <div className="dusk-sky-bg text-white">
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p className="text-gray-400 text-sm mt-1">Marlin Growth Agent — Live Control Room</p>
+            <h1 className="text-2xl font-bold sunrise-text">Mission Control</h1>
+            <p className="text-gray-400 text-sm mt-1">Marlin Growth Agent — every AI decision, audited live</p>
           </div>
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-xs text-gray-400">
-              <span className={`w-2 h-2 rounded-full ${newEvents ? 'bg-approved pulse-active' : 'bg-gray-600'}`}></span>
+              <Radio className={`w-3.5 h-3.5 ${newEvents ? 'text-approved pulse-active' : 'text-gray-600'}`} />
               Live
             </span>
             <button
               onClick={() => refreshLedger()}
-              className="text-sm text-gray-400 hover:text-white transition border border-surface-dark-border px-3 py-1.5 rounded-lg"
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition border border-dusk-border px-3 py-1.5 rounded-lg hover:border-candy-lavender/50"
             >
-              ↻ Refresh
+              <RefreshCw className="w-3.5 h-3.5" /> Refresh
             </button>
           </div>
         </div>
+
+        {/* State color legend */}
+        <ColorLegend />
 
         {/* Stats */}
         <StatStrip stats={stats} />
 
         {/* Tabs */}
-        <div className="flex gap-1 bg-surface-dark-card rounded-xl p-1 mb-6">
+        <div className="flex gap-1 bg-dusk-card rounded-xl p-1 mb-6">
           {[
             { id: 'ledger', label: 'Live Ledger Feed' },
             { id: 'campaigns', label: 'Campaigns' },
@@ -137,7 +142,7 @@ export default function Dashboard() {
               key={t.id}
               onClick={() => setTab(t.id)}
               className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition ${
-                tab === t.id ? 'bg-ai-proposed text-white' : 'text-gray-400 hover:text-white'
+                tab === t.id ? 'bg-candy-btn text-white shadow-candy' : 'text-gray-400 hover:text-white'
               }`}
             >
               {t.label}
@@ -160,7 +165,11 @@ export default function Dashboard() {
             )}
             <div className="space-y-3 mt-4 max-h-[60vh] overflow-y-auto ledger-scroll pr-2">
               {ledger.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No ledger entries yet. Make a checkout to see events.</p>
+                <div className="text-center py-10 text-gray-500">
+                  <p className="text-3xl mb-3 opacity-60">🛰️</p>
+                  <p className="text-sm">No ledger entries yet.</p>
+                  <p className="text-xs mt-1 text-gray-600">Make a checkout on the storefront to see events stream in here.</p>
+                </div>
               ) : (
                 ledger.map(entry => (
                   <FourStateCard
@@ -182,14 +191,18 @@ export default function Dashboard() {
               <button
                 onClick={handleReviewCampaign}
                 disabled={loading}
-                className="bg-ai-proposed text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-600 transition disabled:opacity-50"
+                className="flex items-center gap-1.5 bg-candy-btn text-white px-4 py-2 rounded-lg text-sm font-medium shadow-candy hover:opacity-90 transition disabled:opacity-50"
               >
                 {loading ? 'Reviewing...' : 'Run Campaign Review'}
               </button>
             </div>
             <div className="space-y-3">
               {campaigns.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No campaigns yet. Click "Run Campaign Review" to have the Brain propose one.</p>
+                <div className="text-center py-10 text-gray-500">
+                  <p className="text-3xl mb-3 opacity-60">📣</p>
+                  <p className="text-sm">No campaigns yet.</p>
+                  <p className="text-xs mt-1 text-gray-600">Run a campaign review to let the Brain propose one from order history.</p>
+                </div>
               ) : (
                 campaigns.map(c => (
                   <CampaignCard

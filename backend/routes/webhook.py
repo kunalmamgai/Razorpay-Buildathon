@@ -1,11 +1,15 @@
 """Webhook and payment routes — Razorpay payment verification and simulation."""
+import json
+import logging
 from fastapi import APIRouter, Request, HTTPException
 from backend.models import PaymentVerifyRequest, PaymentSimulateRequest
 from backend.services.payment_service import (
     verify_and_record_payment, process_webhook, simulate_payment_failure,
 )
+from backend.webhook_verifier import verify_webhook_signature
 
 router = APIRouter(prefix="/api", tags=["payment"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/payment/verify")
@@ -32,16 +36,21 @@ def payment_verify(req: PaymentVerifyRequest):
 @router.post("/webhooks/razorpay")
 async def razorpay_webhook(request: Request):
     """Handle Razorpay payment status webhook.
-
+    
     Idempotent — duplicate webhooks don't create duplicate records.
     Verifies webhook signature when configured.
     """
     raw_body = await request.body()
     payload = await request.json()
-
+    
     event = payload.get("event", "")
     signature = request.headers.get("x-razorpay-signature", "")
-
+    
+    # Verify webhook signature if configured
+    if not verify_webhook_signature(raw_body, signature):
+        logger.warning("Invalid webhook signature received")
+        raise HTTPException(status_code=400, detail="Invalid webhook signature")
+    
     try:
         result = process_webhook(
             event=event,
@@ -50,8 +59,9 @@ async def razorpay_webhook(request: Request):
             webhook_signature=signature,
         )
     except Exception as e:
+        logger.error(f"Webhook processing failed: {e}")
         raise HTTPException(status_code=500, detail=f"Webhook processing failed: {e}")
-
+    
     return result
 
 

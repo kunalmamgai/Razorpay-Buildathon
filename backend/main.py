@@ -1,13 +1,29 @@
 """FastAPI app — entrypoint for the Marlin Growth Agent backend."""
 import os
 import logging
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from backend.config import CORS_ORIGINS
+from backend.config import (
+    CORS_ORIGINS, 
+    validate_config, 
+    get_config_summary, 
+    APP_ENV,
+    LOG_LEVEL,
+    LOG_FORMAT
+)
 from backend.db import init_db
 from backend.seed_data import seed
+from backend.rate_limiter import add_rate_limiting
+from backend.logging_config import setup_logging
+
+# Setup logging with environment-based configuration
+setup_logging(level=LOG_LEVEL, json_format=(LOG_FORMAT == "json"))
+
+logger = logging.getLogger("marlin")
 
 # Configure logging
 logging.basicConfig(
@@ -20,6 +36,19 @@ logger = logging.getLogger("marlin")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize DB, seed data, start the orchestrator scheduler."""
+    logger.info(f"Starting Marlin Growth Agent in {APP_ENV} mode...")
+    
+    # Validate configuration
+    config_issues = validate_config()
+    if config_issues:
+        for issue in config_issues:
+            if IS_PRODUCTION:
+                logger.error(f"Configuration issue: {issue}")
+            else:
+                logger.warning(f"Configuration issue: {issue}")
+    else:
+        logger.info("Configuration validated successfully")
+    
     logger.info("Initializing database...")
     init_db()
     seed()
@@ -41,6 +70,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Add rate limiting
+add_rate_limiting(app)
 
 # CORS for frontend dev server
 app.add_middleware(
@@ -75,3 +107,71 @@ def root():
         "description": "AI Growth & Agentic Commerce — Razorpay Hackathon",
         "docs": "/docs",
     }
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for monitoring and deployment."""
+    from backend.db import init_db
+    from backend.ledger.ledger import get_stats
+    
+    # Check database connectivity
+    try:
+        init_db()
+        db_status = "healthy"
+    except Exception as e:
+        db_status = f"unhealthy: {e}"
+    
+    # Get basic stats
+    try:
+        stats = get_stats()
+        db_status = "healthy"
+    except Exception:
+        pass
+    
+    return {
+        "status": "ok" if db_status == "healthy" else "degraded",
+        "database": db_status,
+        "version": "1.0.0",
+    }
+
+
+@app.get("/ready")
+def readiness_check():
+    """Readiness probe for Kubernetes deployment."""
+    # Check if all services are ready
+    checks = {
+        "database": False,
+        "config": False,
+    }
+    
+    try:
+        from backend.db import init_db
+        init_db()
+        checks["database"] = True
+    except Exception:
+        pass
+    
+    # Check config
+    from backend.config import GEMINI_API_KEY, RAZORPAY_KEY_ID
+    checks["config"] = bool(GEMINI_API_KEY and RAZORPAY_KEY_ID)
+    
+    all_ready = all(checks.values())
+    
+    return {
+        "ready": all_ready,
+        "checks": checks,
+    }
+
+
+@app.get("/config")
+def config_summary():
+    """Configuration summary endpoint (for debugging/monitoring)."""
+    # Only allow in non-production environments for security
+    if IS_PRODUCTION:
+        return JSONResponse(
+            status_code=404,
+            content={"detail": "Not found"}
+        )
+    
+    return get_config_summary()

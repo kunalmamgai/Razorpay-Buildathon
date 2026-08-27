@@ -20,7 +20,41 @@ body {
 /* === Italic for AI reasoning text (design-spec §2.3) === */
 .ai-reasoning {
   font-style: italic;
-  color: #64748B;
+}
+
+/* === Cotton candy sky background with cloud glows === */
+.candy-sky-bg {
+  background:
+    radial-gradient(ellipse 55% 40% at 15% 8%, rgba(244, 114, 182, 0.16), transparent),
+    radial-gradient(ellipse 50% 38% at 85% 12%, rgba(125, 211, 252, 0.20), transparent),
+    radial-gradient(ellipse 45% 35% at 50% 95%, rgba(167, 139, 250, 0.14), transparent),
+    linear-gradient(160deg, #FDF2F8 0%, #F5F1FE 45%, #E4F2FD 100%);
+  min-height: 100vh;
+}
+
+/* === Dusk-night dashboard with aurora glows === */
+.dusk-sky-bg {
+  background:
+    radial-gradient(ellipse 50% 35% at 12% 0%, rgba(236, 72, 153, 0.10), transparent),
+    radial-gradient(ellipse 45% 30% at 88% 5%, rgba(56, 189, 248, 0.10), transparent),
+    radial-gradient(ellipse 60% 40% at 50% 100%, rgba(139, 92, 246, 0.10), transparent),
+    #171325;
+  min-height: 100vh;
+}
+
+/* === Sunrise gradient headline text === */
+.sunrise-text {
+  background: linear-gradient(90deg, #EC4899 0%, #A78BFA 50%, #0EA5E9 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* === Frosted glass card (storefront) === */
+.glass-card {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(244, 114, 182, 0.18);
 }
 
 /* === Four-state step connector line === */
@@ -46,9 +80,9 @@ body {
   width: 6px;
 }
 .ledger-scroll::-webkit-scrollbar-track {
-  background: #1E293B;
+  background: #211B36;
 }
 .ledger-scroll::-webkit-scrollbar-thumb {
-  background: #475569;
+  background: #4C3A6E;
   border-radius: 3px;
 }

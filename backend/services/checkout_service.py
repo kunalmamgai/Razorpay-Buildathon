@@ -13,7 +13,7 @@ from backend.brain.gemini_agent import propose_upsell
 from backend.cage.policy_engine import evaluate_upsell_proposal, calculate_final_amount
 from backend.config import RAZORPAY_KEY_ID
 from backend.ledger.ledger import log_entry, get_entry_by_id
-from backend.razorpay_client import create_order
+from backend.razorpay_client import sync_create_order, sync_verify_payment_signature
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +198,7 @@ def approve_checkout(ledger_id: int) -> dict:
 
     # Create Razorpay order
     idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
-    order_data = create_order(
+    order_data = sync_create_order(
         final_amount,
         idempotency_key=idempotency_key,
         notes={
@@ -285,7 +285,7 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
     if idempotency_key is None:
         idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
 
-    order_data = create_order(
+    order_data = sync_create_order(
         final_amount,
         idempotency_key=idempotency_key,
         notes={

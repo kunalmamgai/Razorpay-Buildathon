@@ -21,14 +21,14 @@ export default function FilterBar({ filter, setFilter, counts = {} }) {
             onClick={() => setFilter(f.value)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition ${
               active
-                ? 'bg-ai-proposed text-white'
-                : 'bg-surface-dark-card text-gray-400 hover:text-white border border-surface-dark-border'
+                ? 'bg-candy-btn text-white shadow-candy'
+                : 'bg-dusk-card text-gray-400 hover:text-white border border-dusk-border hover:border-candy-lavender/50'
             }`}
           >
             {f.label}
             {count !== null && count !== undefined && (
               <span className={`font-mono text-[10px] px-1.5 py-0.5 rounded-full ${
-                active ? 'bg-white/20 text-white' : 'bg-surface-dark-border text-gray-400'
+                active ? 'bg-white/25 text-white' : 'bg-dusk-border text-gray-400'
               }`}>
                 {count}
               </span>

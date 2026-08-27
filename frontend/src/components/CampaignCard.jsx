@@ -1,3 +1,4 @@
+import { Timer, Check, X } from 'lucide-react'
 import useCountdown from '../hooks/useCountdown'
 
 export default function CampaignCard({ campaign, onApprove, onReject }) {
@@ -5,8 +6,8 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
     active: 'bg-approved-light text-approved',
     pending: 'bg-clamped-light text-clamped',
     rejected: 'bg-rejected-light text-rejected',
-    draft: 'bg-gray-800 text-gray-400',
-  }[campaign.status] || 'bg-gray-800 text-gray-400'
+    draft: 'bg-dusk-border text-gray-400',
+  }[campaign.status] || 'bg-dusk-border text-gray-400'
 
   let targetSkus = []
   try { targetSkus = JSON.parse(campaign.target_skus_json || '[]') } catch {}
@@ -15,7 +16,7 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
     useCountdown(campaign.expires_at, campaign.starts_at)
 
   return (
-    <div className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-5">
+    <div className="bg-dusk-card border border-dusk-border rounded-xl p-5 hover:border-candy-lavender/40 transition">
       <div className="flex items-start justify-between mb-3">
         <div>
           <h3 className="font-semibold text-white">{campaign.name}</h3>
@@ -45,11 +46,11 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
         <div className="mb-3">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-500">Expires in</span>
-            <span className={`text-xs font-mono font-medium ${expired ? 'text-rejected' : 'text-clamped'}`}>
-              ⏳ {remainingLabel}
+            <span className={`text-xs font-mono font-medium flex items-center gap-1 ${expired ? 'text-rejected' : 'text-clamped'}`}>
+              <Timer className="w-3.5 h-3.5" /> {remainingLabel}
             </span>
           </div>
-          <div className="h-1.5 w-full bg-surface-dark-border rounded-full overflow-hidden">
+          <div className="h-1.5 w-full bg-dusk-border rounded-full overflow-hidden">
             <div
               className={`h-full rounded-full transition-all duration-1000 ${
                 expired ? 'bg-rejected' : progressPct > 75 ? 'bg-clamped' : 'bg-approved'
@@ -64,15 +65,15 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
         <div className="flex gap-3">
           <button
             onClick={onApprove}
-            className="flex-1 bg-approved text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition"
+            className="flex-1 flex items-center justify-center gap-1.5 bg-approved text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition"
           >
-            ✓ Approve Campaign
+            <Check className="w-4 h-4" /> Approve Campaign
           </button>
           <button
             onClick={onReject}
-            className="flex-1 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
+            className="flex-1 flex items-center justify-center gap-1.5 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
           >
-            ✕ Reject Campaign
+            <X className="w-4 h-4" /> Reject Campaign
           </button>
         </div>
       )}

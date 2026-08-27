@@ -1,0 +1,19 @@
+"""Pre-commit hooks for Kilo Code development."""
+from typing import Any
+from pre_commit.lint.constants import FILES  # type: ignore
+import os
+import sys
+
+# Ensure backend imports work
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+try:
+    from pre_commit.lint.constants import FILES as _FILES
+except ImportError:
+    _FILES = ("*.py",)
+
+files: list[Any] = list(_FILES) + [
+    "*.py",
+    "pyproject.toml",
+    "package.json",
+]

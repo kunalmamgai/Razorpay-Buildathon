@@ -1,7 +1,17 @@
 import { useState, useEffect } from 'react'
+import {
+  ShoppingBag, Sparkles, Trash2, Plus, Minus, CloudSun,
+  ShieldCheck, Package, Zap, ArrowRight, Loader2,
+} from 'lucide-react'
 import { fetchProducts, proposeCheckout, approveCheckout, createOrder, verifyPayment } from '../api'
 import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
+
+const CATEGORY_TINTS = {
+  Electronics: 'bg-sky-100 text-sky-600',
+  Accessories: 'bg-pink-100 text-pink-600',
+  Fashion: 'bg-purple-100 text-purple-600',
+}
 
 export default function Storefront() {
   const [products, setProducts] = useState([])
@@ -9,10 +19,14 @@ export default function Storefront() {
   const [checkoutState, setCheckoutState] = useState(null)
   // null | { state: 'proposing' | 'proposal_ready' | 'needs_approval' | 'ordering' | 'order_ready' | 'paid' | 'failed', proposal?, policy_result?, entry_id?, order_id?, ... }
   const [error, setError] = useState(null)
+  const [category, setCategory] = useState('All')
 
   useEffect(() => {
     fetchProducts().then(d => setProducts(d.products)).catch(e => setError(e.message))
   }, [])
+
+  const categories = ['All', ...new Set(products.map(p => p.category))]
+  const visibleProducts = category === 'All' ? products : products.filter(p => p.category === category)
 
   const addToCart = (sku) => {
     setCart(prev => {
@@ -22,6 +36,15 @@ export default function Storefront() {
     })
     setCheckoutState(null)
     setError(null)
+  }
+
+  const changeQty = (sku, delta) => {
+    setCart(prev =>
+      prev
+        .map(i => i.sku === sku ? { ...i, quantity: Math.max(0, i.quantity + delta) } : i)
+        .filter(i => i.quantity > 0)
+    )
+    if (delta < 0) { setCheckoutState(null); setError(null) }
   }
 
   const removeFromCart = (sku) => {
@@ -109,7 +132,7 @@ export default function Storefront() {
         }
       },
       prefill: { name: 'Demo Customer', email: 'demo@marlin.ai' },
-      theme: { color: '#3B82F6' },
+      theme: { color: '#EC4899' },
       modal: {
         ondismiss: () => {
           setCheckoutState(prev => ({ ...prev, state: null }))
@@ -126,35 +149,95 @@ export default function Storefront() {
   }, 0)
 
   return (
-    <div className="min-h-screen bg-surface-light">
+    <div className="candy-sky-bg">
+      {/* Navbar */}
+      <nav className="sticky top-0 z-50 glass-card border-b border-pink-100/70">
+        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <span className="w-9 h-9 rounded-xl bg-candy-btn flex items-center justify-center shadow-candy">
+              <CloudSun className="w-5 h-5 text-white" />
+            </span>
+            <div>
+              <p className="font-bold text-gray-800 leading-tight">Marlin</p>
+              <p className="text-[10px] text-gray-400 leading-tight">cotton candy commerce</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3 text-xs text-gray-400">
+            <span className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/60 border border-purple-100">
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              Every AI offer audited
+            </span>
+            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/60 border border-pink-100 font-medium text-gray-600">
+              <ShoppingBag className="w-4 h-4 text-pink-400" />
+              {cart.length}
+            </span>
+          </div>
+        </div>
+      </nav>
+
       <div className="max-w-6xl mx-auto px-6 py-8">
-        <h1 className="text-2xl font-bold text-surface-dark mb-2">Shop</h1>
-        <p className="text-gray-500 text-sm mb-8">Add items to your cart to see AI-powered upsell suggestions.</p>
+        {/* Hero */}
+        <div className="mb-8">
+          <h1 className="text-3xl md:text-4xl font-bold sunrise-text">Shop under cotton candy skies</h1>
+          <p className="text-gray-500 mt-2 max-w-xl flex items-start gap-2">
+            <Sparkles className="w-4 h-4 mt-0.5 shrink-0 text-pink-400" />
+            Add items to your cart — an AI growth agent may suggest a bundle. Every discount it proposes is checked by a rules engine and logged to a public audit trail.
+          </p>
+        </div>
+
+        {/* Category filter chips */}
+        <div className="flex gap-2 flex-wrap mb-8">
+          {categories.map(c => (
+            <button
+              key={c}
+              onClick={() => setCategory(c)}
+              className={`px-4 py-1.5 rounded-full text-sm font-medium transition ${
+                category === c
+                  ? 'bg-candy-btn text-white shadow-candy'
+                  : 'bg-white/70 text-gray-500 hover:text-gray-800 border border-pink-100 hover:border-pink-200'
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
 
         {/* Product Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
           {products.map(product => (
-            <div key={product.id} className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition">
-              <div className="flex items-start justify-between mb-3">
-                <div>
-                  <h3 className="font-semibold text-surface-dark">{product.name}</h3>
-                  <p className="text-xs text-gray-400 font-mono mt-1">{product.id}</p>
-                </div>
-                {product.discountable ? (
-                  <span className="text-xs bg-ai-proposed-light text-ai-proposed px-2 py-0.5 rounded-full">Discountable</span>
-                ) : (
-                  <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full">Fixed Price</span>
+            <div
+              key={product.id}
+              className="glass-card rounded-2xl overflow-hidden hover:shadow-candy-lg hover:-translate-y-1 transition-all duration-300 group"
+            >
+              <div className="relative h-44 bg-candy-soft overflow-hidden">
+                <img
+                  src={`/products/${product.id}.jpg`}
+                  alt={product.name}
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                />
+                <span className={`absolute top-3 left-3 text-[11px] font-medium px-2.5 py-1 rounded-full backdrop-blur ${CATEGORY_TINTS[product.category] || 'bg-white/80 text-gray-500'}`}>
+                  {product.category}
+                </span>
+                {product.stock_quantity <= 30 && (
+                  <span className="absolute top-3 right-3 text-[11px] font-medium px-2.5 py-1 rounded-full bg-white/85 text-pink-600 backdrop-blur flex items-center gap-1">
+                    <Zap className="w-3 h-3" /> Only {product.stock_quantity} left
+                  </span>
                 )}
               </div>
-              <p className="text-xs text-gray-500 mb-2">{product.category}</p>
-              <div className="flex items-center justify-between">
-                <span className="text-lg font-bold text-surface-dark">{formatCurrency(product.price)}</span>
-                <button
-                  onClick={() => addToCart(product.id)}
-                  className="bg-ai-proposed text-white px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-blue-600 transition"
-                >
-                  Add to Cart
-                </button>
+
+              <div className="p-5">
+                <h3 className="font-semibold text-gray-800">{product.name}</h3>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{product.id}</p>
+                <div className="flex items-center justify-between mt-4">
+                  <span className="text-xl font-bold text-gray-800">{formatCurrency(product.price)}</span>
+                  <button
+                    onClick={() => addToCart(product.id)}
+                    className="flex items-center gap-1.5 bg-candy-btn text-white px-4 py-2 rounded-xl text-sm font-medium shadow-candy hover:opacity-90 hover:shadow-glow transition"
+                  >
+                    <Plus className="w-4 h-4" /> Add
+                  </button>
+                </div>
               </div>
             </div>
           ))}
@@ -162,27 +245,44 @@ export default function Storefront() {
 
         {/* Cart Drawer */}
         {cart.length > 0 && (
-          <div className="fixed bottom-0 right-0 w-full md:w-96 bg-white border-t md:border-t-0 md:border-l border-gray-200 shadow-2xl z-40 p-6 rounded-t-2xl md:rounded-none md:rounded-l-2xl">
-            <h2 className="text-lg font-bold text-surface-dark mb-4">Cart ({cart.length})</h2>
-            <div className="space-y-3 mb-4 max-h-48 overflow-y-auto">
+          <div className="fixed bottom-0 right-0 w-full md:w-96 glass-card border-t md:border-t-0 md:border-l border-pink-100 shadow-candy-lg z-40 p-6 rounded-t-2xl md:rounded-none md:rounded-l-2xl md:max-h-[92vh] md:overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-pink-400" />
+              Cart ({cart.length})
+            </h2>
+            <div className="space-y-3 mb-4 max-h-56 overflow-y-auto pr-1">
               {cart.map(item => {
                 const product = products.find(p => p.id === item.sku)
                 return (
-                  <div key={item.sku} className="flex items-center justify-between">
-                    <div>
-                      <span className="text-sm font-medium">{product?.name || item.sku}</span>
-                      <span className="text-xs text-gray-400 ml-2">×{item.quantity}</span>
+                  <div key={item.sku} className="flex items-center gap-3 bg-white/70 border border-pink-50 rounded-xl p-2.5">
+                    <img
+                      src={`/products/${item.sku}.jpg`}
+                      alt={product?.name || item.sku}
+                      loading="lazy"
+                      className="w-12 h-12 rounded-lg object-cover bg-candy-soft"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-700 truncate">{product?.name || item.sku}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <button onClick={() => changeQty(item.sku, -1)} className="w-5 h-5 rounded-md bg-pink-50 text-gray-500 hover:bg-pink-100 flex items-center justify-center">
+                          <Minus className="w-3 h-3" />
+                        </button>
+                        <span className="text-xs font-mono w-4 text-center">{item.quantity}</span>
+                        <button onClick={() => changeQty(item.sku, 1)} className="w-5 h-5 rounded-md bg-pink-50 text-gray-500 hover:bg-pink-100 flex items-center justify-center">
+                          <Plus className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-mono">{formatCurrency(product?.price * item.quantity || 0)}</span>
-                      <button onClick={() => removeFromCart(item.sku)} className="text-red-400 text-xs hover:text-red-600">✕</button>
-                    </div>
+                    <span className="text-sm font-mono text-gray-600">{formatCurrency((product?.price || 0) * item.quantity)}</span>
+                    <button onClick={() => removeFromCart(item.sku)} className="text-pink-300 hover:text-red-500 transition">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 )
               })}
             </div>
-            <div className="border-t pt-3 mb-4">
-              <div className="flex justify-between font-bold text-surface-dark">
+            <div className="border-t border-pink-100 pt-3 mb-4">
+              <div className="flex justify-between font-bold text-gray-800">
                 <span>Subtotal</span>
                 <span className="font-mono">{formatCurrency(cartTotal)}</span>
               </div>
@@ -209,17 +309,20 @@ export default function Storefront() {
             {!checkoutState || checkoutState.state === null ? (
               <button
                 onClick={handleCheckout}
-                className="w-full bg-surface-dark text-white py-3 rounded-xl font-medium hover:bg-gray-800 transition"
+                disabled={checkoutState?.state === 'ordering'}
+                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition"
               >
-                Checkout
+                Checkout <ArrowRight className="w-4 h-4" />
               </button>
             ) : checkoutState.state === 'needs_approval' ? (
               <div className="text-center">
-                <p className="text-sm text-clamped font-medium mb-2">⏳ Awaiting Merchant Approval</p>
-                <p className="text-xs text-gray-500 mb-3">This offer requires merchant approval before proceeding.</p>
+                <p className="text-sm text-clamped font-medium mb-2 flex items-center justify-center gap-1.5">
+                  <Package className="w-4 h-4 pulse-active" /> Awaiting Merchant Approval
+                </p>
+                <p className="text-xs text-gray-500 mb-3">This offer is above the auto-approve threshold — a human must sign off first.</p>
                 <button
                   disabled
-                  className="w-full bg-gray-300 text-gray-500 py-3 rounded-xl font-medium cursor-not-allowed"
+                  className="w-full bg-gray-200 text-gray-400 py-3 rounded-xl font-medium cursor-not-allowed"
                 >
                   Waiting for Approval...
                 </button>
@@ -237,11 +340,18 @@ export default function Storefront() {
                 </div>
                 <button
                   onClick={() => { setCheckoutState(null); setError(null) }}
-                  className="w-full bg-ai-proposed text-white py-3 rounded-xl font-medium hover:bg-blue-600 transition"
+                  className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition"
                 >
-                  Try Again
+                  Try Again <ArrowRight className="w-4 h-4" />
                 </button>
               </div>
+            ) : checkoutState.state === 'ordering' ? (
+              <button
+                disabled
+                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium opacity-70 cursor-wait"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" /> Creating order...
+              </button>
             ) : checkoutState.state === 'order_ready' || checkoutState.order_id ? (
               <button
                 onClick={() => openRazorpayCheckout(checkoutState)}
@@ -249,20 +359,15 @@ export default function Storefront() {
               >
                 Pay {formatCurrency(checkoutState.final_amount_paise || cartTotal)}
               </button>
-            ) : checkoutState.state === 'ordering' ? (
-              <button
-                disabled
-                className="w-full bg-ai-proposed text-white py-3 rounded-xl font-medium opacity-50 cursor-wait"
-              >
-                Creating order...
-              </button>
             ) : (
               <button
                 onClick={handleApproveAndPay}
                 disabled={checkoutState?.state === 'proposing'}
-                className="w-full bg-ai-proposed text-white py-3 rounded-xl font-medium hover:bg-blue-600 transition disabled:opacity-50"
+                className="w-full flex items-center justify-center gap-2 bg-candy-btn text-white py-3 rounded-xl font-medium shadow-candy hover:opacity-90 transition disabled:opacity-50"
               >
-                {checkoutState?.state === 'proposing' ? 'AI is thinking...' : 'Proceed'}
+                {checkoutState?.state === 'proposing'
+                  ? (<><Loader2 className="w-4 h-4 animate-spin" /> AI is thinking...</>)
+                  : (<>Proceed <ArrowRight className="w-4 h-4" /></>)}
               </button>
             )}
           </div>

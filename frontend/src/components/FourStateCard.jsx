@@ -1,10 +1,10 @@
-import FourStateStep from './FourStateStep'
+import FourStateStep, { StepConnector } from './FourStateStep'
 
 const STEPS = [
-  { key: 'brain', label: 'AI Proposed', icon: '✨' },
-  { key: 'cage', label: 'Policy Check', icon: '⚡' },
-  { key: 'gate', label: 'Order', icon: '📋' },
-  { key: 'payment', label: 'Payment', icon: '💳' },
+  { key: 'brain', label: 'AI Proposed', icon: 'brain' },
+  { key: 'cage', label: 'Policy Check', icon: 'cage' },
+  { key: 'gate', label: 'Order', icon: 'gate' },
+  { key: 'payment', label: 'Payment', icon: 'payment' },
 ]
 
 function getStepStatuses(entry) {
@@ -56,7 +56,7 @@ export default function FourStateCard({ entry, onClick, onSimulateFailure }) {
   return (
     <div
       onClick={() => onClick?.(entry)}
-      className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-4 cursor-pointer hover:border-ai-proposed transition"
+      className="bg-dusk-card border border-dusk-border rounded-xl p-4 cursor-pointer hover:border-candy-lavender/60 hover:shadow-glow transition"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-3">
@@ -68,15 +68,19 @@ export default function FourStateCard({ entry, onClick, onSimulateFailure }) {
         <span className="text-xs text-gray-500">{entry.timestamp}</span>
       </div>
 
-      {/* Four-State Step Bar */}
-      <div className="flex items-center gap-1 mb-3">
+      {/* Four-State Step Bar with connectors */}
+      <div className="flex items-center mb-3">
         {STEPS.map((step, i) => (
-          <FourStateStep
-            key={step.key}
-            icon={step.icon}
-            label={step.label}
-            status={statuses[step.key]}
-          />
+          <div key={step.key} className="flex items-center flex-1">
+            <FourStateStep
+              icon={step.icon}
+              label={step.label}
+              status={statuses[step.key]}
+            />
+            {i < STEPS.length - 1 && (
+              <StepConnector status={statuses[STEPS[i + 1].key]} />
+            )}
+          </div>
         ))}
       </div>
 

@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
+import {
+  Sparkles, Zap, Receipt, CreditCard, XCircle, Undo2, Bell, Pin,
+  AlertTriangle, X,
+} from 'lucide-react'
 import { fetchOrderLifecycle } from '../api'
 
 const LIFECYCLE_STEPS = [
-  { key: 'checkout_proposal', icon: '✨', label: 'AI Proposed', color: 'ai' },
-  { key: 'cage_decision', icon: '⚡', label: 'Policy Check', color: 'clamped' },
-  { key: 'order_created', icon: '📋', label: 'Order Created', color: 'approved' },
-  { key: 'payment_captured', icon: '💳', label: 'Payment Captured', color: 'approved' },
-  { key: 'payment_failed', icon: '❌', label: 'Payment Failed', color: 'rejected' },
-  { key: 'recovery', icon: '↩️', label: 'Graceful Recovery', color: 'approved' },
-  { key: 'payment_webhook', icon: '🔔', label: 'Webhook Update', color: 'ai' },
+  { key: 'checkout_proposal', Icon: Sparkles, label: 'AI Proposed' },
+  { key: 'cage_decision', Icon: Zap, label: 'Policy Check' },
+  { key: 'order_created', Icon: Receipt, label: 'Order Created' },
+  { key: 'payment_captured', Icon: CreditCard, label: 'Payment Captured' },
+  { key: 'payment_failed', Icon: XCircle, label: 'Payment Failed' },
+  { key: 'recovery', Icon: Undo2, label: 'Graceful Recovery' },
+  { key: 'payment_webhook', Icon: Bell, label: 'Webhook Update' },
 ]
 
 export default function FailureRecoveryView({ entry, onClose, onSimulateFailure }) {
@@ -36,33 +40,32 @@ export default function FailureRecoveryView({ entry, onClose, onSimulateFailure 
 
   const getStepForEntry = (e) => {
     return LIFECYCLE_STEPS.find(s => s.key === e.event_type) || {
-      icon: '📌',
+      Icon: Pin,
       label: e.event_type,
-      color: 'ai',
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* Backdrop */}
-      <div className="flex-1 bg-black/50" onClick={onClose}></div>
+      <div className="flex-1 bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
 
       {/* Drawer */}
-      <div className="w-full max-w-lg bg-surface-dark border-l border-surface-dark-border overflow-y-auto">
+      <div className="w-full max-w-lg bg-dusk border-l border-dusk-border overflow-y-auto shadow-glow">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-lg font-bold text-white">Order Lifecycle</h2>
+              <h2 className="text-lg font-bold sunrise-text">Order Lifecycle</h2>
               <p className="text-xs text-gray-500 font-mono mt-1">
                 {entry.razorpay_order_id || entry.correlation_id}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-white text-xl transition"
+              className="text-gray-400 hover:text-white transition p-1 rounded-lg hover:bg-dusk-card"
             >
-              ✕
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -71,7 +74,7 @@ export default function FailureRecoveryView({ entry, onClose, onSimulateFailure 
           ) : (
             <div className="relative">
               {/* Vertical line */}
-              <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-surface-dark-border"></div>
+              <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-dusk-border"></div>
 
               {/* Steps */}
               <div className="space-y-6">
@@ -94,9 +97,9 @@ export default function FailureRecoveryView({ entry, onClose, onSimulateFailure 
 
                   return (
                     <div key={e.id} className="flex gap-4 relative">
-                      {/* Dot */}
-                      <div className={`w-8 h-8 rounded-full ${dotColor} flex items-center justify-center text-sm z-10 flex-shrink-0`}>
-                        {step.icon}
+                      {/* Icon */}
+                      <div className={`w-8 h-8 rounded-full ${dotColor} flex items-center justify-center z-10 flex-shrink-0`}>
+                        <step.Icon className="w-4 h-4 text-white" />
                       </div>
 
                       {/* Content */}
@@ -154,9 +157,9 @@ export default function FailureRecoveryView({ entry, onClose, onSimulateFailure 
                 onSimulateFailure(entry.razorpay_order_id)
                 onClose()
               }}
-              className="w-full mt-6 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
+              className="w-full mt-6 flex items-center justify-center gap-2 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
             >
-              ⚠️ Simulate Payment Failure
+              <AlertTriangle className="w-4 h-4" /> Simulate Payment Failure
             </button>
           )}
         </div>

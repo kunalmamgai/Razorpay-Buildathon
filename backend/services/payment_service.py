@@ -11,7 +11,7 @@ import json
 import logging
 from backend.db import get_db
 from backend.ledger.ledger import log_entry, update_outcome, get_entries_by_order
-from backend.razorpay_client import verify_payment_signature
+from backend.razorpay_client import sync_verify_payment_signature as verify_payment_signature
 
 logger = logging.getLogger(__name__)
 

@@ -1,3 +1,4 @@
+import { Sparkles, ShieldAlert, Clock } from 'lucide-react'
 import { formatCurrency } from '../lib/colors'
 
 export default function AISuggestion({ proposal, policyResult, originalAmount, finalAmount, discountAmount, state }) {
@@ -7,26 +8,36 @@ export default function AISuggestion({ proposal, policyResult, originalAmount, f
   const needsApproval = policyResult?.needs_human_approval
 
   return (
-    <div className={`rounded-xl p-4 mb-4 border ${
-      state === 'paid' ? 'bg-approved-light border-approved' :
-      state === 'failed' ? 'bg-rejected-light border-rejected' :
-      isClamped ? 'bg-clamped-light border-clamped' :
-      'bg-ai-proposed-light border-ai-proposed'
+    <div className={`rounded-xl p-4 mb-4 border backdrop-blur ${
+      state === 'paid' ? 'bg-approved-light/80 border-approved' :
+      state === 'failed' ? 'bg-rejected-light/80 border-rejected' :
+      isClamped ? 'bg-clamped-light/80 border-clamped' :
+      'bg-ai-proposed-light/70 border-ai-proposed/40'
     }`}>
       {/* Header */}
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-lg">✨</span>
-        <span className="text-sm font-bold text-surface-dark">AI Upsell Suggestion</span>
-        {isClamped && <span className="text-xs text-clamped font-medium">(Policy Modified)</span>}
-        {needsApproval && <span className="text-xs text-clamped font-medium">⏳ Needs Approval</span>}
+        <Sparkles className="w-4 h-4 text-ai-proposed" />
+        <span className="text-sm font-bold text-gray-700">Marlin AI suggests</span>
+        {isClamped && (
+          <span className="text-xs text-clamped font-medium flex items-center gap-1">
+            <ShieldAlert className="w-3.5 h-3.5" /> Policy Modified
+          </span>
+        )}
+        {needsApproval && (
+          <span className="text-xs text-clamped font-medium flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" /> Needs Approval
+          </span>
+        )}
       </div>
 
       {/* Discount */}
       <div className="flex items-baseline gap-2 mb-2">
-        <span className="text-2xl font-bold text-ai-proposed font-mono">{proposal.discount_pct}% off</span>
+        <span className="text-2xl font-bold text-ai-proposed font-mono">
+          {(policyResult?.final_action?.discount_pct ?? proposal.discount_pct)}% off
+        </span>
         {isClamped && policyResult.final_action?.discount_pct !== proposal.discount_pct && (
           <span className="text-sm text-clamped line-through font-mono">
-            → {policyResult.final_action.discount_pct}%
+            was {proposal.discount_pct}%
           </span>
         )}
       </div>
@@ -46,7 +57,9 @@ export default function AISuggestion({ proposal, policyResult, originalAmount, f
         <div className="bg-white rounded-lg p-3 space-y-1">
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Original</span>
-            <span className="font-mono text-gray-500">{formatCurrency(originalAmount)}</span>
+            <span className={`font-mono ${discountAmount > 0 ? 'line-through text-gray-400' : 'text-gray-500'}`}>
+              {formatCurrency(originalAmount)}
+            </span>
           </div>
           {discountAmount > 0 && (
             <div className="flex justify-between text-sm">
@@ -55,8 +68,8 @@ export default function AISuggestion({ proposal, policyResult, originalAmount, f
             </div>
           )}
           <div className="flex justify-between text-sm font-bold border-t pt-1">
-            <span className="text-surface-dark">Final</span>
-            <span className="font-mono text-surface-dark">{formatCurrency(finalAmount)}</span>
+            <span className="text-gray-800">Final</span>
+            <span className="font-mono text-gray-800">{formatCurrency(finalAmount)}</span>
           </div>
         </div>
       )}

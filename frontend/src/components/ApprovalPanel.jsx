@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Hourglass, CheckCircle2, Check, X } from 'lucide-react'
 import { fetchApprovals, approveProposal, rejectProposal } from '../api'
 
 export default function ApprovalPanel() {
@@ -41,8 +42,9 @@ export default function ApprovalPanel() {
   if (approvals.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 text-lg mb-2">✅ All Clear</p>
-        <p className="text-gray-400 text-sm">No proposals awaiting merchant approval.</p>
+        <CheckCircle2 className="w-8 h-8 text-approved mx-auto mb-3" />
+        <p className="text-gray-300 text-lg mb-1">All Clear</p>
+        <p className="text-gray-500 text-sm">No proposals awaiting merchant approval.</p>
       </div>
     )
   }
@@ -57,11 +59,13 @@ export default function ApprovalPanel() {
         const violations = (() => { try { return JSON.parse(entry.policy_violations_json || '[]') } catch { return [] } })()
 
         return (
-          <div key={entry.id} className="bg-surface-dark-card border border-surface-dark-border rounded-xl p-5">
+          <div key={entry.id} className="bg-dusk-card border border-dusk-border rounded-xl p-5">
             <div className="flex items-start justify-between mb-3">
               <div>
                 <span className="text-xs font-mono text-gray-500">#{entry.id}</span>
-                <span className="text-xs text-clamped ml-2">⏳ Awaiting Approval</span>
+                <span className="text-xs text-clamped ml-2 inline-flex items-center gap-1">
+                  <Hourglass className="w-3 h-3 pulse-active" /> Awaiting Approval
+                </span>
               </div>
               <span className="text-xs text-gray-500">{entry.timestamp}</span>
             </div>
@@ -93,15 +97,15 @@ export default function ApprovalPanel() {
             <div className="flex gap-3">
               <button
                 onClick={() => handleApprove(entry.id)}
-                className="flex-1 bg-approved text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-approved text-white py-2 rounded-lg text-sm font-medium hover:bg-green-600 transition"
               >
-                ✓ Approve
+                <Check className="w-4 h-4" /> Approve
               </button>
               <button
                 onClick={() => handleReject(entry.id)}
-                className="flex-1 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
+                className="flex-1 flex items-center justify-center gap-1.5 bg-rejected text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600 transition"
               >
-                ✕ Reject
+                <X className="w-4 h-4" /> Reject
               </button>
             </div>
           </div>
