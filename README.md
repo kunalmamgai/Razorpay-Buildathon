@@ -1,5 +1,11 @@
 # Marlin Growth Agent
 
+![Python 3.11](https://img.shields.io/badge/python-3.11-blue?logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61dafb?logo=react&logoColor=white)
+![36 Tests Passing](https://img.shields.io/badge/tests-36%20passing-brightgreen)
+![Razorpay Hackathon](https://img.shields.io/badge/Razorpay%20Hackathon-AI%20Growth%20Track-orange)
+
 An AI-powered merchant revenue growth agent that automatically proposes upsell bundles and promotional campaigns — while every decision is bounded by a deterministic rules engine and immutably logged to a public audit trail.
 
 **Built for the Razorpay AI Commerce Hackathon** · Track: AI Growth & Agentic Commerce
