@@ -9,6 +9,8 @@ import { fetchProducts, proposeCheckout, approveCheckout, createOrder, verifyPay
 import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
 
+import Navbar from '../components/Navbar'
+
 const CATEGORY_TINTS = {
   Electronics: 'bg-sky-50 text-sky-600 border-sky-200',
   Accessories: 'bg-pink-50 text-pink-600 border-pink-200',
@@ -33,7 +35,22 @@ export default function Storefront() {
   })
 
   useEffect(() => {
-    fetchProducts().then(d => setProducts(d.products)).catch(e => setError(e.message))
+    fetchProducts().then(d => {
+      setProducts(d.products)
+      try {
+        if (sessionStorage.getItem('marlin_demo_autofill') === 'true') {
+          sessionStorage.removeItem('marlin_demo_autofill')
+          if (d.products && d.products.length >= 2) {
+            setCart([
+              { sku: d.products[0].id, quantity: 1 },
+              { sku: d.products[1].id, quantity: 1 },
+            ])
+          }
+        }
+      } catch (e) {
+        console.error(e)
+      }
+    }).catch(e => setError(e.message))
   }, [])
 
   const categories = ['All', ...new Set(products.map(p => p.category))]
@@ -164,30 +181,7 @@ export default function Storefront() {
   return (
     <div className="min-h-screen bg-white">
       {/* Navbar */}
-      <nav className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-6 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2">
-              <span className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-                <ShieldCheck className="w-4 h-4 text-white" />
-              </span>
-              <span className="font-bold text-gray-900">Marlin</span>
-            </Link>
-            <span className="text-gray-300">|</span>
-            <Link to="/dashboard" className="text-sm text-gray-500 hover:text-gray-900 transition">Dashboard</Link>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:flex items-center gap-1.5 text-xs text-gray-400">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Every AI offer audited
-            </span>
-            <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-100 text-sm font-medium text-gray-700">
-              <ShoppingBag className="w-4 h-4" />
-              {cart.length}
-            </span>
-          </div>
-        </div>
-      </nav>
+      <Navbar cartCount={cart.length} />
 
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Onboarding Explainer */}

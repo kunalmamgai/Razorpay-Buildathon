@@ -9,6 +9,7 @@ import ApprovalPanel from '../components/ApprovalPanel'
 import CampaignCard from '../components/CampaignCard'
 import AgentActivityStrip from '../components/AgentActivityStrip'
 import ColorLegend from '../components/ColorLegend'
+import Navbar from '../components/Navbar'
 
 const LEDGER_POLL_MS = 5000
 
@@ -103,7 +104,8 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="dusk-sky-bg text-white">
+    <div className="dusk-sky-bg text-white min-h-screen">
+      <Navbar />
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
