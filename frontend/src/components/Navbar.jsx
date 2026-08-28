@@ -1,5 +1,5 @@
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { ShieldCheck, Sparkles, LayoutDashboard, ShoppingBag, ArrowRight, Zap } from 'lucide-react'
+import { ShieldCheck, Sparkles, LayoutDashboard, ShoppingBag, ArrowRight, Zap, CheckSquare, FileText } from 'lucide-react'
 
 export default function Navbar({ cartCount = 0 }) {
   const location = useLocation()
@@ -7,6 +7,9 @@ export default function Navbar({ cartCount = 0 }) {
 
   const isStore = location.pathname === '/store' || location.pathname === '/storefront'
   const isDashboard = location.pathname === '/dashboard'
+  const isCampaigns = location.pathname === '/campaigns'
+  const isApprovals = location.pathname === '/approvals'
+  const isAudit = location.pathname === '/audit' || location.pathname === '/audit-logs'
   const isLanding = location.pathname === '/' || location.pathname === '/onboarding'
 
   const handleGetStartedClick = () => {
@@ -62,6 +65,42 @@ export default function Navbar({ cartCount = 0 }) {
             >
               <ShoppingBag className="w-3.5 h-3.5" />
               Storefront
+            </Link>
+
+            <Link
+              to="/campaigns"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1.5 ${
+                isCampaigns
+                  ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30 shadow-sm'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Campaigns
+            </Link>
+
+            <Link
+              to="/approvals"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1.5 ${
+                isApprovals
+                  ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <CheckSquare className="w-3.5 h-3.5 text-emerald-400" />
+              Approvals
+            </Link>
+
+            <Link
+              to="/audit"
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-150 flex items-center gap-1.5 ${
+                isAudit
+                  ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shadow-sm'
+                  : 'text-gray-300 hover:text-white hover:bg-gray-800/60'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-cyan-400" />
+              Audit Logs
             </Link>
 
             <Link
