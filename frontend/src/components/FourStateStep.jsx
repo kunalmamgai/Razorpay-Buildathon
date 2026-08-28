@@ -23,16 +23,21 @@ const STATUS_STYLES = {
 
 export default function FourStateStep({ icon, label, status }) {
   const Icon = typeof icon === 'string' ? (STEP_ICONS[icon] || Sparkles) : icon
-  const tooltip = typeof icon === 'string' ? (STEP_DESCRIPTIONS[icon] || label) : label
+  const description = typeof icon === 'string' ? STEP_DESCRIPTIONS[icon] : null
   return (
-    <div className="flex items-center flex-1" title={tooltip}>
+    <div className="flex items-center flex-1">
       <div className="flex flex-col items-center flex-1">
         <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${STATUS_STYLES[status] || STATUS_STYLES.pending} ${status === 'pending' ? 'pulse-active' : ''}`}>
           {status === 'completed'
             ? <Check className="w-4 h-4" />
             : <Icon className="w-3.5 h-3.5" />}
         </div>
-        <span className="text-[10px] text-gray-500 mt-1 text-center">{label}</span>
+        <span className="text-[10px] text-gray-500 mt-1 text-center font-medium">{label}</span>
+        {description && (
+          <span className="text-[9px] text-gray-600 mt-0.5 text-center leading-tight max-w-[90px]">
+            {description.split(': ')[1] || description}
+          </span>
+        )}
       </div>
     </div>
   )
