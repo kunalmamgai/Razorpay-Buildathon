@@ -15,8 +15,37 @@ import Navbar from '../components/Navbar'
 
 const LEDGER_POLL_MS = 5000
 
-// Default diverse realistic entries representing all 4 outcome types (Approved, Clamped, Rejected, Failed)
+// Default diverse realistic entries reordered (Approved & Failed cards brought to top, followed by Clamped & Rejected)
 const DEFAULT_LEDGER_ENTRIES = [
+  {
+    id: 9922,
+    correlation_id: 'req_551a_approved',
+    actor: 'Agent: VIP-Reward-Bot',
+    trigger: 'loyalty_tier_2',
+    outcome: 'paid',
+    policy_decision: 'approved',
+    proposal_json: JSON.stringify({ discount_pct: 10, reasoning: 'repeat customer loyalty reward: order count > 5' }),
+    final_action_json: JSON.stringify({ discount_pct: 10, reason: 'approved' }),
+    policy_violations_json: '[]',
+    razorpay_order_id: 'order_paid_9922',
+    razorpay_payment_id: 'pay_approved_9922',
+    reasoning: 'repeat customer loyalty reward: order count > 5',
+    timestamp: '14:05:12.912',
+  },
+  {
+    id: 9921,
+    correlation_id: 'req_902b_fail',
+    actor: 'Agent: Recovery-Agent',
+    trigger: 'payment_retry_flow',
+    outcome: 'failed',
+    policy_decision: 'approved',
+    proposal_json: JSON.stringify({ discount_pct: 15, reasoning: 'payment timeout recovery offer' }),
+    final_action_json: JSON.stringify({ discount_pct: 15, reason: 'approved' }),
+    policy_violations_json: JSON.stringify(['ERR_GATEWAY_TIMEOUT: Provider did not respond within 30000ms.']),
+    razorpay_order_id: 'order_failed_9921',
+    reasoning: 'payment timeout recovery offer',
+    timestamp: '14:03:55.800',
+  },
   {
     id: 9924,
     correlation_id: 'req_8x11n9_clamped',
@@ -44,35 +73,6 @@ const DEFAULT_LEDGER_ENTRIES = [
     policy_violations_json: JSON.stringify(['Margin threshold violation detected on target SKU. Max allowed discount 20%.']),
     reasoning: 'overstock clearance flash sale proposal',
     timestamp: '14:01:10.040',
-  },
-  {
-    id: 9922,
-    correlation_id: 'req_551a_approved',
-    actor: 'Agent: VIP-Reward-Bot',
-    trigger: 'loyalty_tier_2',
-    outcome: 'paid',
-    policy_decision: 'approved',
-    proposal_json: JSON.stringify({ discount_pct: 10, reasoning: 'repeat customer loyalty reward: order count > 5' }),
-    final_action_json: JSON.stringify({ discount_pct: 10, reason: 'approved' }),
-    policy_violations_json: '[]',
-    razorpay_order_id: 'order_paid_9922',
-    razorpay_payment_id: 'pay_approved_9922',
-    reasoning: 'repeat customer loyalty reward: order count > 5',
-    timestamp: '13:58:30.912',
-  },
-  {
-    id: 9921,
-    correlation_id: 'req_902b_fail',
-    actor: 'Agent: Recovery-Agent',
-    trigger: 'payment_retry_flow',
-    outcome: 'failed',
-    policy_decision: 'approved',
-    proposal_json: JSON.stringify({ discount_pct: 15, reasoning: 'payment timeout recovery offer' }),
-    final_action_json: JSON.stringify({ discount_pct: 15, reason: 'approved' }),
-    policy_violations_json: JSON.stringify(['ERR_GATEWAY_TIMEOUT: Provider did not respond within 30000ms.']),
-    razorpay_order_id: 'order_failed_9921',
-    reasoning: 'payment timeout recovery offer',
-    timestamp: '13:55:12.800',
   },
 ]
 
