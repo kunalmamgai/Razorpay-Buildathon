@@ -19,17 +19,7 @@ valid_skus_strategy = st.sampled_from(list(DISCOUNTABLE_SKUS)[:3])  # Use a subs
 invalid_skus_strategy = st.text(min_size=1, max_size=10).filter(
     lambda s: s not in DISCOUNTABLE_SKUS and not s.startswith("SKU_")
 )
-catalog_strategy = st.lists(
-    st.dictionaries(
-        st.text(min_size=1, max_size=5),  # id
-        st.dictionaries(
-            st.just("id"),
-            st.text(min_size=3, max_size=10)
-        )
-    ),
-    min_size=0,
-    max_size=5
-)
+# catalog_strategy removed: was defined but never used in any @given decorator
 
 
 @given(

@@ -26,13 +26,6 @@ setup_logging(level=LOG_LEVEL, json_format=(LOG_FORMAT == "json"))
 
 logger = logging.getLogger("marlin")
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-)
-logger = logging.getLogger("marlin")
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -62,6 +55,21 @@ async def lifespan(app: FastAPI):
 
     from backend.services.scheduler import stop_scheduler
     stop_scheduler()
+
+    # Close the async Razorpay HTTP client to prevent connection leaks
+    from backend.razorpay_client import get_async_client
+    try:
+        import asyncio
+        client = get_async_client()
+        if client and hasattr(client, 'aclose'):
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(client.aclose())
+            else:
+                loop.run_until_complete(client.aclose())
+    except Exception:
+        pass
+
     logger.info("Shutting down.")
 
 
@@ -112,27 +120,52 @@ def root():
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint for monitoring and deployment."""
+    """Health check endpoint -- validates DB, Gemini, and Razorpay connectivity."""
     from backend.db import init_db
     from backend.ledger.ledger import get_stats
-    
-    # Check database connectivity
+    from backend.config import GEMINI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+
+    checks = {}
+    overall = "ok"
+
+    # 1. Database
     try:
         init_db()
-        db_status = "healthy"
+        get_stats()
+        checks["database"] = "healthy"
     except Exception as e:
-        db_status = f"unhealthy: {e}"
-    
-    # Get basic stats
+        checks["database"] = f"unhealthy: {e}"
+        overall = "degraded"
+
+    # 2. Gemini API key present (lightweight: we don't make a live call, just check config)
+    if GEMINI_API_KEY:
+        checks["gemini"] = "configured"
+    else:
+        checks["gemini"] = "not_configured"
+        # Not fatal in dev -- Brain returns fallback proposals
+
+    # 3. Razorpay keys present
+    if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+        checks["razorpay"] = "configured"
+    else:
+        checks["razorpay"] = "not_configured"
+        # Not fatal in dev -- mock orders are used
+
+    # 4. Scheduler
     try:
-        stats = get_stats()
-        db_status = "healthy"
+        from backend.services.scheduler import get_schedule_info
+        sched = get_schedule_info()
+        checks["scheduler"] = "running" if sched.get("scheduler_running") else "stopped"
     except Exception:
-        pass
-    
+        checks["scheduler"] = "unknown"
+
+    # Determine overall status
+    if checks.get("database", "").startswith("unhealthy"):
+        overall = "degraded"
+
     return {
-        "status": "ok" if db_status == "healthy" else "degraded",
-        "database": db_status,
+        "status": overall,
+        "checks": checks,
         "version": "1.0.0",
     }
 

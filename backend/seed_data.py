@@ -1,3 +1,4 @@
+import logging
 """Seed data — realistic products and fake order history for the campaign orchestrator.
 
 Products include:
@@ -13,6 +14,8 @@ Order history is designed to give the campaign orchestrator signal:
 import json
 from datetime import datetime, timedelta
 from backend.db import get_db, init_db
+
+logger = logging.getLogger(__name__)
 
 
 PRODUCTS = [
@@ -163,7 +166,7 @@ def seed():
     with get_db() as conn:
         count = conn.execute("SELECT COUNT(*) FROM products").fetchone()[0]
         if count > 0:
-            print(f"Database already has {count} products. Skipping seed.")
+            logger.info(f"Database already has {count} products. Skipping seed.")
             return
 
         for product in PRODUCTS:
@@ -179,7 +182,7 @@ def seed():
                     product["stock_quantity"],
                 ),
             )
-        print(f"Seeded {len(PRODUCTS)} products.")
+        logger.info(f"Seeded {len(PRODUCTS)} products.")
 
     # Write order history to a JSON file for the campaign orchestrator
     import os
@@ -187,7 +190,7 @@ def seed():
     os.makedirs(os.path.dirname(history_path), exist_ok=True)
     with open(history_path, "w") as f:
         json.dump(ORDER_HISTORY, f, indent=2)
-    print(f"Generated {len(ORDER_HISTORY)} fake order history records.")
+    logger.info(f"Generated {len(ORDER_HISTORY)} fake order history records.")
 
 
 if __name__ == "__main__":

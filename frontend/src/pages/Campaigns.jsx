@@ -5,69 +5,39 @@ import {
 import Navbar from '../components/Navbar'
 import { fetchCampaigns, reviewCampaign } from '../api'
 
-const MOCK_CAMPAIGNS = [
-  {
-    id: 'CMP-992A-4B',
-    name: 'Q3 Electronics Clearance',
-    status: 'active',
-    skus_targeted: '1,240',
-    avg_discount: '24.5%',
-    progress_label: '12 Days Left',
-    progress_pct: 65,
-    bottom_label: '✨ Optimized 2h ago',
-  },
-  {
-    id: 'CMP-881X-9C',
-    name: 'Holiday Pre-Sale Prep',
-    status: 'pending',
-    skus_targeted: '8,500',
-    avg_discount: '--',
-    progress_label: 'In Queue',
-    progress_pct: 30,
-    bottom_label: '🛡️ Policy Check',
-  },
-  {
-    id: 'CMP-774V-2Z',
-    name: 'Flash Sale - Accessories',
-    status: 'rejected',
-    skus_targeted: '450',
-    avg_discount: '45.0%',
-    warning_text: 'Margin threshold violation detected on 12 SKUs. Max allowed discount 35%.',
-    bottom_label: '✎ Revise',
-  },
-  {
-    id: 'CMP-NEW',
-    name: 'Winter Collection Promo',
-    status: 'draft',
-    skus_targeted: '--',
-    avg_discount: '--',
-    bottom_label: '▷ Resume Setup',
-  },
-]
-
 export default function Campaigns() {
-  const [campaigns, setCampaigns] = useState(MOCK_CAMPAIGNS)
+  const [campaigns, setCampaigns] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
 
   const loadCampaigns = async () => {
     try {
       const data = await fetchCampaigns()
-      if (data.campaigns && data.campaigns.length > 0) {
-        const realMapped = data.campaigns.map(c => ({
+      const list = data.campaigns || []
+      const realMapped = list.map(c => {
+        let targetSkus = []
+        try { targetSkus = JSON.parse(c.target_skus_json || '[]') } catch {}
+        return {
           id: c.id || `CMP-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
           name: c.name,
-          status: c.status || 'pending',
-          skus_targeted: '1,240',
-          avg_discount: `${c.discount_pct || 20}%`,
-          progress_label: c.status === 'active' ? '14 Days Left' : 'Awaiting Approval',
-          progress_pct: 50,
-          bottom_label: c.status === 'active' ? '✨ Optimized 1h ago' : '🛡️ Policy Check',
-        }))
-        setCampaigns(realMapped)
-      }
+          status: c.status || 'draft',
+          discount_pct: c.discount_pct,
+          target_skus: targetSkus,
+          policy_decision: c.policy_decision,
+          skus_targeted: targetSkus.length > 0 ? `${targetSkus.length} SKU(s)` : '--',
+          avg_discount: c.discount_pct ? `${c.discount_pct}%` : '--',
+          progress_label: c.status === 'active' ? 'Active' : c.status === 'pending' ? 'Awaiting Approval' : c.status === 'rejected' ? 'Rejected' : 'Draft',
+          progress_pct: c.status === 'active' ? 65 : c.status === 'pending' ? 30 : 0,
+          bottom_label: c.status === 'active' ? '✨ Optimized' : c.status === 'pending' ? '🛡️ Policy Check' : c.status === 'rejected' ? '✎ Rejected' : '▷ Resume Setup',
+          warning_text: c.status === 'rejected' ? `Policy decision: ${c.policy_decision || 'rejected'}` : null,
+          created_by: c.created_by || 'system',
+          starts_at: c.starts_at,
+          expires_at: c.expires_at,
+        }
+      })
+      setCampaigns(realMapped)
     } catch (e) {
-      console.error(e)
+      console.error('Failed to load campaigns:', e)
     }
   }
 

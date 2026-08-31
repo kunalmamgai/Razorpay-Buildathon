@@ -11,8 +11,9 @@ class TestRateLimiting:
         """Test that rate limit headers are present in responses."""
         client = TestClient(app)
         response = client.get("/")
-        # Check that rate limit headers are present (when limiter is active)
-        # Note: In test environment, limits might not be enforced but headers should be there
+        assert response.status_code == 200
+        # Rate limiter adds X-RateLimit-* headers when slowapi is active
+        # In test env, the handler may not inject headers but the endpoint must work
         
     def test_health_endpoint(self):
         """Test health check endpoint."""
@@ -21,7 +22,8 @@ class TestRateLimiting:
         assert response.status_code == 200
         data = response.json()
         assert "status" in data
-        assert "database" in data
+        assert "checks" in data
+        assert "database" in data["checks"]
         assert "version" in data
         
     def test_ready_endpoint(self):

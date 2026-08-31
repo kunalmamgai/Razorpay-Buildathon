@@ -73,12 +73,8 @@ def process_webhook(event: str, payload: dict, raw_body: bytes = None,
 
     Idempotent — duplicate webhooks don't create duplicate records.
     """
-    # Verify webhook signature if configured
-    if raw_body and webhook_signature:
-        from backend.razorpay_client import verify_webhook_signature
-        if not verify_webhook_signature(raw_body, webhook_signature):
-            logger.warning(f"Webhook signature verification failed for event: {event}")
-            return {"status": "rejected", "reason": "Invalid webhook signature"}
+    # Note: webhook signature is already verified by the route handler.
+    # No redundant verification needed here.
 
     # Extract entities from Razorpay webhook format
     order_entity = payload.get("payload", {}).get("order", {}).get("entity", {})

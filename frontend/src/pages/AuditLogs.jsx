@@ -83,9 +83,20 @@ const BLOCK_HASHES = [
 
 export default function AuditLogs() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [realEntries, setRealEntries] = useState([])
   const [verifying, setVerifying] = useState(false)
   const [verifySuccess, setVerifySuccess] = useState(false)
   const [eventTypeFilter, setEventTypeFilter] = useState('all')
+
+  useEffect(() => {
+    fetchLedger(100)
+      .then(d => {
+        if (d.entries && d.entries.length > 0) {
+          setRealEntries(d.entries)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const handleVerifyChain = () => {
     setVerifying(true)
@@ -254,7 +265,34 @@ export default function AuditLogs() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {filteredRows.map((row, idx) => {
+                  {(() => {
+          // Use real entries if available, otherwise fall back to mock data
+          const displayRows = realEntries.length > 0
+            ? realEntries.map(e => ({
+                timestamp: e.timestamp || 'N/A',
+                log_id: e.id ? `TX-${String(e.id).slice(-4)}` : 'TX-0000',
+                event_type: e.event_type || 'Unknown',
+                icon: e.event_type?.includes('proposal') ? Sparkles
+                    : e.event_type?.includes('payment') ? Receipt
+                    : e.event_type?.includes('approval') ? ShieldCheck
+                    : e.event_type?.includes('webhook') ? Zap
+                    : Sparkles,
+                icon_color: e.outcome === 'paid' ? 'text-emerald-400'
+                          : e.outcome === 'rejected' ? 'text-rose-400'
+                          : e.outcome === 'clamped' ? 'text-amber-400'
+                          : e.outcome === 'failed' ? 'text-rose-400'
+                          : 'text-blue-400',
+                node: e.actor || 'system',
+                status: (e.outcome || 'pending').toUpperCase(),
+                status_style: e.outcome === 'paid' ? 'text-emerald-300 bg-emerald-950/80 border-emerald-500/30'
+                            : e.outcome === 'rejected' ? 'text-rose-300 bg-rose-950/80 border-rose-500/30'
+                            : e.outcome === 'clamped' ? 'text-amber-300 bg-amber-950/80 border-amber-500/30'
+                            : e.outcome === 'failed' ? 'text-rose-300 bg-rose-950/80 border-rose-500/30'
+                            : 'text-blue-300 bg-blue-950/80 border-blue-500/30',
+              }))
+            : filteredRows
+          return displayRows
+        })().map((row, idx) => {
                     const IconComponent = row.icon
                     return (
                       <tr key={idx} className="hover:bg-white/[0.02] transition">

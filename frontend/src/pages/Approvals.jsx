@@ -1,9 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import ApprovalPanel from '../components/ApprovalPanel'
+import { fetchApprovals } from '../api'
 
 export default function Approvals() {
+  const [pendingCount, setPendingCount] = useState(0)
+
+  useEffect(() => {
+    fetchApprovals()
+      .then(d => setPendingCount(d.count || 0))
+      .catch(() => {})
+  }, [])
+
   return (
     <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white">
       {/* Top Navbar */}
@@ -26,7 +35,7 @@ export default function Approvals() {
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-2 text-xs font-mono font-bold text-amber-300 bg-amber-950/80 border border-amber-500/40 px-3.5 py-1.5 rounded-xl shadow-sm">
               <AlertTriangle className="w-4 h-4 text-amber-400" />
-              12 Pending
+              {pendingCount} Pending
             </span>
           </div>
         </div>

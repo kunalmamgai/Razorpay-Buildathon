@@ -439,3 +439,58 @@ class TestLedgerCompleteAudit:
         assert "order_created" in event_types
         assert "payment_failed" in event_types
         assert "recovery" in event_types
+
+
+# ================================================================
+# 19. RACE CONDITION PROTECTION -- concurrent approvals
+# ================================================================
+
+class TestApprovalRaceCondition:
+    def test_concurrent_approvals_only_one_succeeds(self, client):
+        """Two approval requests for the same entry: exactly one must succeed.
+
+        Uses BEGIN IMMEDIATE to acquire an exclusive SQLite lock so the
+        second transaction sees the row is already approved.
+        """
+        with patch("backend.services.checkout_service.propose_upsell",
+                   return_value=make_proposal(16, ["SKU_101"])):
+            resp = propose_cart(client, [{"sku": "SKU_101", "quantity": 1}])
+        entry_id = resp.json()["entry_id"]
+
+        # First approval -- must succeed
+        resp1 = client.post("/api/checkout/approve", json={"ledger_id": entry_id})
+        assert resp1.status_code == 200, f"First approval should succeed, got {resp1.status_code}: {resp1.text}"
+
+        # Second approval of the same entry -- must be rejected
+        resp2 = client.post("/api/checkout/approve", json={"ledger_id": entry_id})
+        assert resp2.status_code == 400, f"Second approval must fail with 400, got {resp2.status_code}: {resp2.text}"
+
+        # Verify exactly one order was created for this entry
+        from backend.db import get_db
+        with get_db() as conn:
+            orders = conn.execute(
+                "SELECT * FROM orders WHERE offer_id = ?",
+                (f"offer_{resp1.json()['correlation_id']}",)
+            ).fetchall()
+            assert len(orders) == 1, f"Expected exactly 1 order, got {len(orders)}"
+
+    def test_approval_after_already_approved_returns_400(self, client):
+        """Approving an entry that was already approved must always 400."""
+        with patch("backend.services.checkout_service.propose_upsell",
+                   return_value=make_proposal(18, ["SKU_101", "SKU_102"])):
+            resp = propose_cart(client, [
+                {"sku": "SKU_101", "quantity": 1},
+                {"sku": "SKU_102", "quantity": 1},
+            ])
+        entry_id = resp.json()["entry_id"]
+
+        # Approve twice -- second must fail
+        client.post("/api/checkout/approve", json={"ledger_id": entry_id})
+        resp = client.post("/api/checkout/approve", json={"ledger_id": entry_id})
+        assert resp.status_code == 400
+        assert "already been approved" in resp.json()["detail"]
+
+        # Ledger entry must show approved status
+        from backend.ledger.ledger import get_entry_by_id
+        entry = get_entry_by_id(entry_id)
+        assert entry["approval_status"] == "approved"

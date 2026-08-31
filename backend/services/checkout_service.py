@@ -46,14 +46,29 @@ def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Legacy fallback for entries created before snapshots existed
+    # Legacy fallback for entries created before snapshots existed.
+    # Use cart_json (all items) for the original total, not just proposal SKUs.
     catalog = get_catalog()
     catalog_map = {p["id"]: p for p in catalog}
     original_total = 0
-    for sku in final_action.get("skus", []):
-        product = catalog_map.get(sku)
-        if product:
-            original_total += product["price"]
+    cart_raw = entry.get("cart_json")
+    if cart_raw:
+        try:
+            cart_items = json.loads(cart_raw) if isinstance(cart_raw, str) else cart_raw
+            for item in cart_items:
+                sku = item.get("sku") if isinstance(item, dict) else item
+                product = catalog_map.get(sku)
+                if product:
+                    qty = item.get("quantity", 1) if isinstance(item, dict) else 1
+                    original_total += product["price"] * qty
+        except (json.JSONDecodeError, TypeError):
+            pass
+    # Fallback: if cart_json was empty or missing, use proposal SKUs
+    if original_total == 0:
+        for sku in final_action.get("skus", []):
+            product = catalog_map.get(sku)
+            if product:
+                original_total += product["price"]
     if original_total == 0:
         original_total = 100000  # ₹1,000 fallback
 
@@ -174,9 +189,24 @@ def approve_checkout(ledger_id: int) -> dict:
     if entry.get("approval_status") == "approved":
         raise ValueError(f"Entry {ledger_id} has already been approved")
 
-    # Update ledger with approval
-    from backend.ledger.ledger import update_approval
-    update_approval(ledger_id, "approved", "merchant")
+    # Update ledger with approval using BEGIN IMMEDIATE to prevent race condition
+    from backend.db import get_connection
+    from datetime import datetime
+    with get_connection() as conn:
+        # Use BEGIN IMMEDIATE to acquire an exclusive lock and prevent double-approval
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT id FROM ledger WHERE id = ? AND (approval_status IS NULL OR approval_status != 'approved')",
+            (ledger_id,)
+        ).fetchone()
+        if not row:
+            conn.execute("ROLLBACK")
+            raise ValueError(f"Entry {ledger_id} has already been approved")
+        conn.execute(
+            "UPDATE ledger SET approval_status = ?, approval_actor = ?, approval_timestamp = ? WHERE id = ?",
+            ("approved", "merchant", datetime.utcnow().isoformat(), ledger_id),
+        )
+        conn.execute("COMMIT")
 
     # Now create the Razorpay order
     final_action = json.loads(entry["final_action_json"]) if entry["final_action_json"] else {}

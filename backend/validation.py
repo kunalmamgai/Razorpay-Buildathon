@@ -3,7 +3,8 @@ import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlparse
 
-from backend.config import DISCOUNTABLE_SKUS
+# Re-exported for backward compatibility (used by tests)
+from backend.config import DISCOUNTABLE_SKUS  # noqa: F401
 
 
 def sanitize_string(value: str, max_length: int = 255) -> str:
