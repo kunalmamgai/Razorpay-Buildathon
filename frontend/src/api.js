@@ -109,3 +109,11 @@ export const rejectCampaign = (id) =>
 // ── Simulation ────────────────────────────────────────────
 export const simulatePaymentFailure = (orderId) =>
   request(`/simulate/payment-failure?order_id=${orderId}`, { method: 'POST' })
+
+// ── Analytics & Feedback Loop ─────────────────────────────
+export const fetchAnalyticsOverview = () => request('/analytics/overview')
+export const fetchRevenueLift = () => request('/analytics/revenue-lift')
+export const fetchConversionFunnel = () => request('/analytics/funnel')
+export const fetchAnomalies = () => request('/analytics/anomalies')
+export const exportRetrainingDataset = () =>
+  request('/analytics/export-dataset', { method: 'POST' })

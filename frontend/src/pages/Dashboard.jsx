@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   RefreshCw, Radio, Sparkles, LayoutDashboard, Activity, ShieldCheck,
-  Lock, CheckCircle2, AlertTriangle, Play, X
+  Lock, CheckCircle2, AlertTriangle, Play, X, TrendingUp
 } from 'lucide-react'
 import { fetchLedger, fetchLedgerStats, fetchCampaigns, reviewCampaign, approveCampaign, rejectCampaign, simulatePaymentFailure } from '../api'
 import StatStrip from '../components/StatStrip'
@@ -11,6 +11,7 @@ import FailureRecoveryView from '../components/FailureRecoveryView'
 import ApprovalPanel from '../components/ApprovalPanel'
 import CampaignCard from '../components/CampaignCard'
 import AgentActivityStrip from '../components/AgentActivityStrip'
+import AnalyticsView from '../components/AnalyticsView'
 import Navbar from '../components/Navbar'
 
 const LEDGER_POLL_MS = 5000
@@ -220,6 +221,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2 border-b border-gray-800 pb-3 mb-8 overflow-x-auto">
           {[
             { id: 'overview', label: 'Live Ledger Stream', icon: LayoutDashboard },
+            { id: 'analytics', label: 'Analytics & Feedback', icon: TrendingUp },
             { id: 'monitoring', label: 'Monitoring & Latency', icon: Activity },
             { id: 'policies', label: 'Rules & Bounds', icon: Lock },
             { id: 'campaigns', label: 'Campaign Proposals', icon: Sparkles },
@@ -395,6 +397,9 @@ export default function Dashboard() {
 
         {/* TAB 5: APPROVALS */}
         {activeTab === 'approvals' && <ApprovalPanel />}
+
+        {/* TAB 6: ANALYTICS & FEEDBACK */}
+        {activeTab === 'analytics' && <AnalyticsView />}
 
       </main>
 

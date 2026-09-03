@@ -95,6 +95,7 @@ from backend.routes.campaign import router as campaign_router
 from backend.routes.ledger import router as ledger_router
 from backend.routes.products import router as products_router
 from backend.routes.merchants import router as merchants_router
+from backend.routes.analytics import router as analytics_router
 
 app.include_router(checkout_router)
 app.include_router(approval_router)
@@ -103,6 +104,7 @@ app.include_router(campaign_router)
 app.include_router(ledger_router)
 app.include_router(products_router)
 app.include_router(merchants_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")
