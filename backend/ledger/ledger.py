@@ -1,8 +1,11 @@
 """The Ledger — immutable audit trail of every decision and API call per isolated merchant database.
+
+Write operations use primary write pool (get_write_db).
+Read queries use Read Replica pool (get_read_db) to keep write paths fast and isolated.
 """
 import json
 import uuid
-from backend.db import get_db
+from backend.db import get_write_db, get_read_db, get_db
 
 
 def log_entry(
@@ -23,7 +26,7 @@ def log_entry(
     amounts: dict | None = None,
     merchant_id: str = "merchant_default",
 ) -> int:
-    """Write a single ledger entry into the isolated merchant database and return its ID."""
+    """Write a single ledger entry into primary write pool."""
     violations = []
     final_action = None
     policy_decision = None
@@ -35,7 +38,7 @@ def log_entry(
         final_action = policy_result.get("final_action")
         policy_version = policy_result.get("policy_version", "policy-v1")
 
-    with get_db(merchant_id) as conn:
+    with get_write_db(merchant_id) as conn:
         cursor = conn.execute(
             """INSERT INTO ledger
                (correlation_id, event_type, actor, trigger,
@@ -75,9 +78,9 @@ def update_approval(
     approval_actor: str,
     merchant_id: str = "merchant_default",
 ) -> bool:
-    """Update a ledger entry with approval decision."""
+    """Update a ledger entry with approval decision in primary write pool."""
     from datetime import datetime
-    with get_db(merchant_id) as conn:
+    with get_write_db(merchant_id) as conn:
         cursor = conn.execute(
             """UPDATE ledger
                SET approval_status = ?, approval_actor = ?, approval_timestamp = ?
@@ -95,8 +98,8 @@ def update_outcome(
     error_message: str | None = None,
     merchant_id: str = "merchant_default",
 ) -> bool:
-    """Update a ledger entry's outcome."""
-    with get_db(merchant_id) as conn:
+    """Update a ledger entry's outcome in primary write pool."""
+    with get_write_db(merchant_id) as conn:
         updates = ["outcome = ?"]
         params = [outcome]
         if razorpay_payment_id:
@@ -121,8 +124,8 @@ def get_entries(
     filter_outcome: str | None = None,
     merchant_id: str = "merchant_default",
 ) -> list[dict]:
-    """Read recent ledger entries from the specified merchant database."""
-    with get_db(merchant_id) as conn:
+    """Read recent ledger entries from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         if filter_outcome:
             rows = conn.execute(
                 "SELECT * FROM ledger WHERE outcome = ? ORDER BY id DESC LIMIT ?",
@@ -137,8 +140,8 @@ def get_entries(
 
 
 def get_entries_by_correlation(correlation_id: str, merchant_id: str = "merchant_default") -> list[dict]:
-    """Get all ledger entries for a correlation_id in a merchant DB."""
-    with get_db(merchant_id) as conn:
+    """Get all ledger entries for a correlation_id from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         rows = conn.execute(
             "SELECT * FROM ledger WHERE correlation_id = ? ORDER BY id ASC",
             (correlation_id,),
@@ -147,8 +150,8 @@ def get_entries_by_correlation(correlation_id: str, merchant_id: str = "merchant
 
 
 def get_entries_by_order(order_id: str, merchant_id: str = "merchant_default") -> list[dict]:
-    """Get all ledger entries for a specific Razorpay order."""
-    with get_db(merchant_id) as conn:
+    """Get all ledger entries for a specific Razorpay order from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         rows = conn.execute(
             "SELECT * FROM ledger WHERE razorpay_order_id = ? ORDER BY id ASC",
             (order_id,),
@@ -157,8 +160,8 @@ def get_entries_by_order(order_id: str, merchant_id: str = "merchant_default") -
 
 
 def get_entry_by_id(entry_id: int, merchant_id: str = "merchant_default") -> dict | None:
-    """Read a single ledger entry by ID."""
-    with get_db(merchant_id) as conn:
+    """Read a single ledger entry by ID from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         row = conn.execute(
             "SELECT * FROM ledger WHERE id = ?", (entry_id,)
         ).fetchone()
@@ -166,8 +169,8 @@ def get_entry_by_id(entry_id: int, merchant_id: str = "merchant_default") -> dic
 
 
 def get_pending_approvals(merchant_id: str = "merchant_default") -> list[dict]:
-    """Get ledger entries awaiting merchant approval in merchant DB."""
-    with get_db(merchant_id) as conn:
+    """Get ledger entries awaiting merchant approval from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         rows = conn.execute(
             """SELECT * FROM ledger
                WHERE outcome = 'awaiting_approval'
@@ -178,8 +181,8 @@ def get_pending_approvals(merchant_id: str = "merchant_default") -> list[dict]:
 
 
 def get_stats(merchant_id: str = "merchant_default") -> dict:
-    """Return aggregate stats for the merchant dashboard."""
-    with get_db(merchant_id) as conn:
+    """Return aggregate stats for the merchant dashboard from Read Replica pool."""
+    with get_read_db(merchant_id) as conn:
         total = conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0]
         approved = conn.execute(
             "SELECT COUNT(*) FROM ledger WHERE outcome = 'approved'"

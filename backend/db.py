@@ -1,47 +1,75 @@
-"""SQLite database — connection management, per-merchant database isolation, and schema creation.
-
-Schema is insert-only for ledger (no erasing rejected proposals).
-Includes webhook idempotency deduplication & dead-letter queue (DLQ) tables.
+"""SQLite & PostgreSQL Connection Management — supports multi-tenant database isolation,
+connection pooling, and Read Replica query routing.
 """
 import sqlite3
 from pathlib import Path
 from contextlib import contextmanager
 import backend.config as _config
+from backend.db_adapter import (
+    PostgresPoolManager, ConnectionWrapper, IS_POSTGRES_MODE
+)
 
 MERCHANTS_DIR = _config.DATA_DIR / "merchants"
 MERCHANTS_DIR.mkdir(exist_ok=True, parents=True)
 
 
 def get_merchant_db_path(merchant_id: str = "merchant_default") -> Path:
-    """Get isolated database file path for a specific merchant."""
+    """Get isolated database file path for a specific merchant in SQLite mode."""
     safe_id = "".join(c for c in merchant_id if c.isalnum() or c in ("_", "-")) or "merchant_default"
     return MERCHANTS_DIR / f"{safe_id}.db"
 
 
-def get_connection(merchant_id: str = "merchant_default") -> sqlite3.Connection:
-    """Get SQLite connection to a merchant's isolated database file."""
+def get_connection(merchant_id: str = "merchant_default", read_only: bool = False) -> ConnectionWrapper:
+    """Get database connection — uses Postgres pool if configured, else SQLite per-merchant file."""
+    if IS_POSTGRES_MODE:
+        PostgresPoolManager.initialize()
+        conn = PostgresPoolManager.get_read_connection() if read_only else PostgresPoolManager.get_write_connection()
+        if conn:
+            return conn
+
+    # Fallback to SQLite mode
     db_path = get_merchant_db_path(merchant_id)
-    conn = sqlite3.connect(str(db_path))
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA foreign_keys=ON")
-    return conn
+    raw_conn = sqlite3.connect(str(db_path))
+    raw_conn.row_factory = sqlite3.Row
+    raw_conn.execute("PRAGMA journal_mode=WAL")
+    raw_conn.execute("PRAGMA foreign_keys=ON")
+    return ConnectionWrapper(raw_conn, is_postgres=False)
 
 
 @contextmanager
-def get_db(merchant_id: str = "merchant_default"):
-    """Context manager for merchant database operations."""
-    conn = get_connection(merchant_id)
+def get_write_db(merchant_id: str = "merchant_default"):
+    """Context manager for write operations (transactional primary pool)."""
+    conn = get_connection(merchant_id, read_only=False)
     try:
         yield conn
         conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
 
+@contextmanager
+def get_read_db(merchant_id: str = "merchant_default"):
+    """Context manager for high-throughput read operations (Read Replica pool)."""
+    conn = get_connection(merchant_id, read_only=True)
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+@contextmanager
+def get_db(merchant_id: str = "merchant_default"):
+    """Backward-compatible default context manager for database operations."""
+    with get_write_db(merchant_id) as conn:
+        yield conn
+
+
 def init_db(merchant_id: str = "merchant_default"):
     """Create all tables in the specified merchant's isolated database if they don't exist."""
-    with get_db(merchant_id) as conn:
+    with get_write_db(merchant_id) as conn:
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS products (
@@ -143,11 +171,6 @@ def init_db(merchant_id: str = "merchant_default"):
             CREATE INDEX IF NOT EXISTS idx_dlq_merchant_status ON dlq_webhooks(merchant_id, status);
             """
         )
-    # Lightweight migration for pre-existing databases
-    with get_db(merchant_id) as conn:
-        cols = [row[1] for row in conn.execute("PRAGMA table_info(ledger)").fetchall()]
-        if "amounts_json" not in cols:
-            conn.execute("ALTER TABLE ledger ADD COLUMN amounts_json TEXT DEFAULT NULL")
 
 
 def init_all_merchants_db():

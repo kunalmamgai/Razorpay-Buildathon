@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
         logger.info("Configuration validated successfully")
     
     logger.info("Initializing multi-tenant database infrastructure...")
+    from backend.db_adapter import PostgresPoolManager
+    PostgresPoolManager.initialize()
     init_master_db()
     seed_all_merchants()
     logger.info("Multi-tenant databases ready.")
@@ -53,6 +55,8 @@ async def lifespan(app: FastAPI):
 
     from backend.services.scheduler import stop_scheduler
     stop_scheduler()
+
+    PostgresPoolManager.close_all()
 
     from backend.razorpay_client import get_async_client
     try:
