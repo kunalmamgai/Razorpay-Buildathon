@@ -72,37 +72,38 @@ export default function Storefront() {
   const [category, setCategory] = useState('All Products')
   const [showExplainer, setShowExplainer] = useState(false)
 
-  useEffect(() => {
+  const loadProducts = () => {
     fetchProducts().then(d => {
       let catalog = d.products || []
-      // Merge extra products if not already in API catalog
       EXTRA_PRODUCTS.forEach(extra => {
         if (!catalog.some(p => p.id === extra.id)) {
           catalog.push(extra)
         }
       })
       setProducts(catalog)
-
-      try {
-        if (sessionStorage.getItem('marlin_demo_autofill') === 'true') {
-          sessionStorage.removeItem('marlin_demo_autofill')
-          // Auto fill Earbuds & USB Cable for instant AI proposal test
-          const earbuds = catalog.find(p => p.id === 'SKU_101') || catalog[0]
-          const accessory = catalog.find(p => p.id === 'SKU_102') || catalog[1]
-          if (earbuds && accessory) {
-            setCart([
-              { sku: earbuds.id, quantity: 1 },
-              { sku: accessory.id, quantity: 1 },
-            ])
-          }
-        }
-      } catch (e) {
-        console.error(e)
-      }
     }).catch(() => {
-      // Fallback catalog if backend is loading
       setProducts(EXTRA_PRODUCTS)
     })
+  }
+
+  useEffect(() => {
+    loadProducts()
+
+    try {
+      if (sessionStorage.getItem('marlin_demo_autofill') === 'true') {
+        sessionStorage.removeItem('marlin_demo_autofill')
+        setCart([
+          { sku: 'SKU_101', quantity: 1 },
+          { sku: 'SKU_102', quantity: 1 },
+        ])
+      }
+    } catch (e) {
+      console.error(e)
+    }
+
+    const handleMerchantChange = () => loadProducts()
+    window.addEventListener('marlin_merchant_changed', handleMerchantChange)
+    return () => window.removeEventListener('marlin_merchant_changed', handleMerchantChange)
   }, [])
 
   const categories = ['All Products', 'Electronics', 'Accessories', 'Wearables', 'Gear', 'Fashion']

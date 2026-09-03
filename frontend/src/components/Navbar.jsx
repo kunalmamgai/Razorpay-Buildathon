@@ -1,8 +1,32 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ShieldCheck, Sparkles, LayoutDashboard, ShoppingBag, CheckSquare, FileText } from 'lucide-react'
+import { ShieldCheck, Sparkles, LayoutDashboard, ShoppingBag, CheckSquare, FileText, Store } from 'lucide-react'
+import { fetchMerchants, getActiveMerchant, setActiveMerchant } from '../api'
 
 export default function Navbar({ cartCount = 0 }) {
   const location = useLocation()
+  const [merchants, setMerchants] = useState([
+    { merchant_id: 'merchant_default', name: 'Marlin Store (Default)' },
+    { merchant_id: 'apex_electronics', name: 'Apex Electronics' },
+    { merchant_id: 'nexus_fashion', name: 'Nexus Luxury Fashion' },
+  ])
+  const [activeMerchantId, setActiveMerchantId] = useState(getActiveMerchant())
+
+  useEffect(() => {
+    fetchMerchants()
+      .then(res => {
+        if (res.merchants && res.merchants.length > 0) {
+          setMerchants(res.merchants)
+        }
+      })
+      .catch(console.error)
+  }, [])
+
+  const handleMerchantChange = (e) => {
+    const newId = e.target.value
+    setActiveMerchantId(newId)
+    setActiveMerchant(newId)
+  }
 
   const isStore = location.pathname === '/store' || location.pathname === '/storefront'
   const isDashboard = location.pathname === '/dashboard'
@@ -32,7 +56,7 @@ export default function Navbar({ cartCount = 0 }) {
           </Link>
         </div>
 
-        {/* Center Main Navigation Links (Mission Control placed right after Overview) */}
+        {/* Center Main Navigation Links */}
         <div className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 overflow-x-auto py-1">
           <Link
             to="/"
@@ -107,12 +131,28 @@ export default function Navbar({ cartCount = 0 }) {
           </Link>
         </div>
 
-        {/* Right Status Badge & Cart Counter */}
-        <div className="flex items-center gap-3 shrink-0">
+        {/* Right Section: Merchant Tenant Selector & Status */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          {/* Multi-Tenant Switcher */}
+          <div className="flex items-center gap-1.5 bg-[#121625] border border-cyan-500/30 px-2.5 py-1 rounded-xl text-xs shadow-inner">
+            <Store className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+            <select
+              value={activeMerchantId}
+              onChange={handleMerchantChange}
+              className="bg-transparent text-white text-[11px] font-mono font-semibold focus:outline-none cursor-pointer pr-1"
+            >
+              {merchants.map(m => (
+                <option key={m.merchant_id} value={m.merchant_id} className="bg-[#0e111b] text-white">
+                  {m.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Active 3-Layer Model Badge */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-gray-300 bg-[#121625] px-3 py-1.5 rounded-xl border border-white/5 shadow-inner">
+          <div className="hidden xl:flex items-center gap-2 text-xs text-gray-300 bg-[#121625] px-3 py-1.5 rounded-xl border border-white/5 shadow-inner">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span className="text-[11px] font-mono font-medium">3-Layer Safety Model Active</span>
+            <span className="text-[11px] font-mono font-medium">3-Layer Safety Active</span>
           </div>
 
           {/* Cart Counter Badge if in Storefront */}

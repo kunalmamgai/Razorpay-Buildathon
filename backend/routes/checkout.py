@@ -1,22 +1,22 @@
-"""Checkout routes — split into propose, approve, create-order per spec."""
-import os
-from fastapi import APIRouter, HTTPException
+"""Checkout routes — split into propose, approve, create-order per spec with multi-tenant merchant context."""
+from fastapi import APIRouter, HTTPException, Depends
 from backend.models import (
     CheckoutProposeRequest, CheckoutApproveRequest, CheckoutCreateOrderRequest,
 )
 from backend.services.checkout_service import (
     propose_checkout, approve_checkout, create_order_from_proposal,
 )
+from backend.tenant_context import get_current_merchant_id
 
 router = APIRouter(prefix="/api", tags=["checkout"])
 
 
 @router.post("/checkout/propose")
-def checkout_propose(req: CheckoutProposeRequest):
-    """Step 1: Brain proposes, Cage evaluates, result stored.
-
-    Does NOT create a Razorpay order. Returns proposal for display.
-    """
+def checkout_propose(
+    req: CheckoutProposeRequest,
+    merchant_id: str = Depends(get_current_merchant_id),
+):
+    """Step 1: Brain proposes, Cage evaluates with merchant policy, result stored in merchant DB."""
     if not req.cart:
         raise HTTPException(status_code=400, detail="Cart is empty")
 
@@ -24,6 +24,7 @@ def checkout_propose(req: CheckoutProposeRequest):
         result = propose_checkout(
             cart=[item.model_dump() for item in req.cart],
             idempotency_key=req.idempotency_key,
+            merchant_id=merchant_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -34,14 +35,13 @@ def checkout_propose(req: CheckoutProposeRequest):
 
 
 @router.post("/checkout/approve")
-def checkout_approve(req: CheckoutApproveRequest):
-    """Step 2: Merchant approves a pending proposal.
-
-    Only works for proposals with outcome=awaiting_approval.
-    Creates the Razorpay order after approval.
-    """
+def checkout_approve(
+    req: CheckoutApproveRequest,
+    merchant_id: str = Depends(get_current_merchant_id),
+):
+    """Step 2: Merchant approves a pending proposal in their isolated DB."""
     try:
-        result = approve_checkout(req.ledger_id)
+        result = approve_checkout(req.ledger_id, merchant_id=merchant_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -51,14 +51,16 @@ def checkout_approve(req: CheckoutApproveRequest):
 
 
 @router.post("/checkout/create-order")
-def checkout_create_order(req: CheckoutCreateOrderRequest):
-    """Step 3: Create Razorpay order for auto-approved proposals.
-
-    For proposals that don't need approval (approved/clamped).
-    """
+def checkout_create_order(
+    req: CheckoutCreateOrderRequest,
+    merchant_id: str = Depends(get_current_merchant_id),
+):
+    """Step 3: Create Razorpay order for auto-approved proposals in active merchant DB."""
     try:
         result = create_order_from_proposal(
-            req.ledger_id, idempotency_key=req.idempotency_key,
+            req.ledger_id,
+            idempotency_key=req.idempotency_key,
+            merchant_id=merchant_id,
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))

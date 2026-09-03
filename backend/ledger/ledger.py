@@ -1,9 +1,4 @@
-"""The Ledger — immutable audit trail of every decision and API call.
-
-Every entry answers: what was proposed, why, what the cage did, what happened with money.
-Entries are INSERT-ONLY — we never erase rejected proposals or failed payments.
-
-Each entry has a correlation_id that groups related events for the same checkout/campaign.
+"""The Ledger — immutable audit trail of every decision and API call per isolated merchant database.
 """
 import json
 import uuid
@@ -26,8 +21,9 @@ def log_entry(
     error_message: str | None = None,
     approval_status: str | None = None,
     amounts: dict | None = None,
+    merchant_id: str = "merchant_default",
 ) -> int:
-    """Write a single ledger entry and return its ID."""
+    """Write a single ledger entry into the isolated merchant database and return its ID."""
     violations = []
     final_action = None
     policy_decision = None
@@ -39,7 +35,7 @@ def log_entry(
         final_action = policy_result.get("final_action")
         policy_version = policy_result.get("policy_version", "policy-v1")
 
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         cursor = conn.execute(
             """INSERT INTO ledger
                (correlation_id, event_type, actor, trigger,
@@ -73,10 +69,15 @@ def log_entry(
         return cursor.lastrowid
 
 
-def update_approval(entry_id: int, approval_status: str, approval_actor: str) -> bool:
+def update_approval(
+    entry_id: int,
+    approval_status: str,
+    approval_actor: str,
+    merchant_id: str = "merchant_default",
+) -> bool:
     """Update a ledger entry with approval decision."""
     from datetime import datetime
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         cursor = conn.execute(
             """UPDATE ledger
                SET approval_status = ?, approval_actor = ?, approval_timestamp = ?
@@ -86,10 +87,16 @@ def update_approval(entry_id: int, approval_status: str, approval_actor: str) ->
         return cursor.rowcount > 0
 
 
-def update_outcome(entry_id: int, outcome: str, razorpay_payment_id: str | None = None,
-                   error_code: str | None = None, error_message: str | None = None) -> bool:
-    """Update a ledger entry's outcome (e.g., after payment result)."""
-    with get_db() as conn:
+def update_outcome(
+    entry_id: int,
+    outcome: str,
+    razorpay_payment_id: str | None = None,
+    error_code: str | None = None,
+    error_message: str | None = None,
+    merchant_id: str = "merchant_default",
+) -> bool:
+    """Update a ledger entry's outcome."""
+    with get_db(merchant_id) as conn:
         updates = ["outcome = ?"]
         params = [outcome]
         if razorpay_payment_id:
@@ -109,9 +116,13 @@ def update_outcome(entry_id: int, outcome: str, razorpay_payment_id: str | None 
         return cursor.rowcount > 0
 
 
-def get_entries(limit: int = 50, filter_outcome: str | None = None) -> list[dict]:
-    """Read recent ledger entries, optionally filtered by outcome."""
-    with get_db() as conn:
+def get_entries(
+    limit: int = 50,
+    filter_outcome: str | None = None,
+    merchant_id: str = "merchant_default",
+) -> list[dict]:
+    """Read recent ledger entries from the specified merchant database."""
+    with get_db(merchant_id) as conn:
         if filter_outcome:
             rows = conn.execute(
                 "SELECT * FROM ledger WHERE outcome = ? ORDER BY id DESC LIMIT ?",
@@ -125,9 +136,9 @@ def get_entries(limit: int = 50, filter_outcome: str | None = None) -> list[dict
         return [dict(row) for row in rows]
 
 
-def get_entries_by_correlation(correlation_id: str) -> list[dict]:
-    """Get all ledger entries for a correlation_id — full lifecycle view."""
-    with get_db() as conn:
+def get_entries_by_correlation(correlation_id: str, merchant_id: str = "merchant_default") -> list[dict]:
+    """Get all ledger entries for a correlation_id in a merchant DB."""
+    with get_db(merchant_id) as conn:
         rows = conn.execute(
             "SELECT * FROM ledger WHERE correlation_id = ? ORDER BY id ASC",
             (correlation_id,),
@@ -135,9 +146,9 @@ def get_entries_by_correlation(correlation_id: str) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_entries_by_order(order_id: str) -> list[dict]:
-    """Get all ledger entries for a specific Razorpay order, ordered chronologically."""
-    with get_db() as conn:
+def get_entries_by_order(order_id: str, merchant_id: str = "merchant_default") -> list[dict]:
+    """Get all ledger entries for a specific Razorpay order."""
+    with get_db(merchant_id) as conn:
         rows = conn.execute(
             "SELECT * FROM ledger WHERE razorpay_order_id = ? ORDER BY id ASC",
             (order_id,),
@@ -145,18 +156,18 @@ def get_entries_by_order(order_id: str) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_entry_by_id(entry_id: int) -> dict | None:
+def get_entry_by_id(entry_id: int, merchant_id: str = "merchant_default") -> dict | None:
     """Read a single ledger entry by ID."""
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         row = conn.execute(
             "SELECT * FROM ledger WHERE id = ?", (entry_id,)
         ).fetchone()
         return dict(row) if row else None
 
 
-def get_pending_approvals() -> list[dict]:
-    """Get ledger entries awaiting merchant approval."""
-    with get_db() as conn:
+def get_pending_approvals(merchant_id: str = "merchant_default") -> list[dict]:
+    """Get ledger entries awaiting merchant approval in merchant DB."""
+    with get_db(merchant_id) as conn:
         rows = conn.execute(
             """SELECT * FROM ledger
                WHERE outcome = 'awaiting_approval'
@@ -166,9 +177,9 @@ def get_pending_approvals() -> list[dict]:
         return [dict(row) for row in rows]
 
 
-def get_stats() -> dict:
-    """Return aggregate stats for the dashboard stat strip."""
-    with get_db() as conn:
+def get_stats(merchant_id: str = "merchant_default") -> dict:
+    """Return aggregate stats for the merchant dashboard."""
+    with get_db(merchant_id) as conn:
         total = conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0]
         approved = conn.execute(
             "SELECT COUNT(*) FROM ledger WHERE outcome = 'approved'"
@@ -198,4 +209,5 @@ def get_stats() -> dict:
             "paid": paid,
             "failed": failed,
             "rejection_rate": round(rejected / total * 100, 1) if total > 0 else 0,
+            "merchant_id": merchant_id,
         }

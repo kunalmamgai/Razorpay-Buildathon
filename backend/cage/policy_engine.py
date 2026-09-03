@@ -1,26 +1,31 @@
-"""The Cage — deterministic policy engine.
+"""The Cage — deterministic policy engine with dynamic multi-tenant policy configuration support.
 
-No external calls. No LLM. No database. Pure functions that clamp or reject proposals.
-This layer is boring on purpose — it's the approval workflow.
+No external calls. No LLM. Pure functions that clamp or reject proposals.
+This layer is the approval workflow & safety guardrail authority.
 
 The Cage is the ONLY authority for executable discounts and campaigns.
 Gemini output is always evaluated here before any money movement.
 """
 from backend.config import (
-    MAX_DISCOUNT_PCT,
-    AUTO_APPROVE_THRESHOLD_PCT,
-    DISCOUNTABLE_SKUS,
-    MAX_CAMPAIGN_DISCOUNT_PCT,
-    MAX_CAMPAIGN_DURATION_HOURS,
+    MAX_DISCOUNT_PCT as DEFAULT_MAX_DISCOUNT_PCT,
+    AUTO_APPROVE_THRESHOLD_PCT as DEFAULT_AUTO_APPROVE_THRESHOLD_PCT,
+    DISCOUNTABLE_SKUS as DEFAULT_DISCOUNTABLE_SKUS,
+    MAX_CAMPAIGN_DISCOUNT_PCT as DEFAULT_MAX_CAMPAIGN_DISCOUNT_PCT,
+    MAX_CAMPAIGN_DURATION_HOURS as DEFAULT_MAX_CAMPAIGN_DURATION_HOURS,
 )
 
 
-def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) -> dict:
-    """Evaluate an upsell proposal against hard limits.
+def evaluate_upsell_proposal(
+    proposal: dict,
+    catalog: list[dict] | None = None,
+    policy_config: dict | None = None,
+) -> dict:
+    """Evaluate an upsell proposal against hard limits for a specific merchant configuration.
 
     Args:
         proposal: dict with keys action, discount_pct, skus, reasoning
         catalog: optional list of product dicts for SKU validation
+        policy_config: optional dict with merchant-specific policy limits
 
     Returns:
         dict with keys:
@@ -30,6 +35,11 @@ def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) 
             needs_human_approval: bool
             policy_version: "policy-v1"
     """
+    cfg = policy_config or {}
+    max_discount_pct = cfg.get("max_discount_pct", DEFAULT_MAX_DISCOUNT_PCT)
+    auto_approve_threshold_pct = cfg.get("auto_approve_threshold_pct", DEFAULT_AUTO_APPROVE_THRESHOLD_PCT)
+    discountable_skus = set(cfg.get("discountable_skus", DEFAULT_DISCOUNTABLE_SKUS))
+
     action = proposal.get("action", "no_offer")
     pct = proposal.get("discount_pct", 0)
     skus = list(proposal.get("skus", []))
@@ -53,14 +63,14 @@ def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) 
         violations.append(f"discount {pct}% exceeds 100% — invalid")
         return _rejected(violations)
 
-    # ── Clamp discounts above MAX_DISCOUNT_PCT ──
-    if pct > MAX_DISCOUNT_PCT:
+    # ── Clamp discounts above max_discount_pct ──
+    if pct > max_discount_pct:
         violations.append(
-            f"discount {pct}% exceeds maximum allowed discount of {MAX_DISCOUNT_PCT}%"
+            f"discount {pct}% exceeds maximum allowed merchant discount of {max_discount_pct}%"
         )
-        pct = MAX_DISCOUNT_PCT
+        pct = max_discount_pct
 
-    # ── Validate SKU IDs against catalog ──
+    # ── Validate SKU IDs against catalog / discountable list ──
     if catalog:
         catalog_ids = {p["id"] for p in catalog}
         unknown_skus = [s for s in skus if s not in catalog_ids]
@@ -70,13 +80,12 @@ def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) 
             )
             skus = [s for s in skus if s in catalog_ids]
     else:
-        # Fall back to static allowlist if no catalog provided
-        non_discountable = [s for s in skus if s not in DISCOUNTABLE_SKUS]
+        non_discountable = [s for s in skus if s not in discountable_skus]
         if non_discountable:
             violations.append(
                 f"non-discountable SKU(s): {', '.join(non_discountable)}"
             )
-            skus = [s for s in skus if s in DISCOUNTABLE_SKUS]
+            skus = [s for s in skus if s in discountable_skus]
 
     # ── Reject if no valid SKUs remain ──
     if not skus and pct > 0:
@@ -84,16 +93,15 @@ def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) 
         pct = 0
         return _rejected(violations)
 
-    # ── Empty SKU list with 0% discount is fine (no_offer equivalent) ──
+    # ── Empty SKU list with 0% discount is fine ──
     if not skus:
         return _approved(violations=violations, final_action={"discount_pct": 0, "skus": []})
 
     # ── Determine approval status ──
     final_action = {"discount_pct": pct, "skus": skus}
-    needs_approval = pct > AUTO_APPROVE_THRESHOLD_PCT
+    needs_approval = pct > auto_approve_threshold_pct
 
     if violations:
-        # Modified but still valid → clamped (or awaiting_approval if above threshold)
         if needs_approval:
             return _awaiting_approval(violations, final_action)
         return _clamped(violations, final_action)
@@ -103,19 +111,30 @@ def evaluate_upsell_proposal(proposal: dict, catalog: list[dict] | None = None) 
         return _approved(violations, final_action)
 
 
-def evaluate_campaign_proposal(proposal: dict, catalog: list[dict] | None = None,
-                                current_time=None) -> dict:
-    """Evaluate a campaign proposal against hard limits.
+def evaluate_campaign_proposal(
+    proposal: dict,
+    catalog: list[dict] | None = None,
+    current_time=None,
+    policy_config: dict | None = None,
+) -> dict:
+    """Evaluate a campaign proposal against hard limits for a merchant.
 
     Args:
         proposal: dict with keys action, name, discount_pct, target_skus, duration_hours
         catalog: optional list of product dicts for SKU validation
         current_time: optional datetime for duration validation
+        policy_config: optional dict with merchant-specific policy limits
 
     Returns:
         dict with same structure as evaluate_upsell_proposal
     """
-    action = proposal.get("action", "no_campaign")
+    cfg = policy_config or {}
+    max_campaign_discount_pct = cfg.get("max_campaign_discount_pct", DEFAULT_MAX_CAMPAIGN_DISCOUNT_PCT)
+    max_campaign_duration_hours = cfg.get("max_campaign_duration_hours", DEFAULT_MAX_CAMPAIGN_DURATION_HOURS)
+    auto_approve_threshold_pct = cfg.get("auto_approve_threshold_pct", DEFAULT_AUTO_APPROVE_THRESHOLD_PCT)
+    discountable_skus = set(cfg.get("discountable_skus", DEFAULT_DISCOUNTABLE_SKUS))
+
+    action = proposal.get("action", "create_campaign")
     pct = proposal.get("discount_pct", 0)
     skus = list(proposal.get("target_skus", proposal.get("skus", [])))
     duration = proposal.get("duration_hours", 48)
@@ -141,18 +160,17 @@ def evaluate_campaign_proposal(proposal: dict, catalog: list[dict] | None = None
         violations.append(f"discount {pct}% exceeds 100% — invalid")
         return _rejected(violations)
 
-    # ── Reject campaigns exceeding MAX_CAMPAIGN_DISCOUNT_PCT ──
-    # Note: campaigns are REJECTED (not clamped) when exceeding hard limit
-    if pct > MAX_CAMPAIGN_DISCOUNT_PCT:
+    # ── Reject campaigns exceeding max_campaign_discount_pct ──
+    if pct > max_campaign_discount_pct:
         violations.append(
-            f"campaign discount {pct}% exceeds maximum allowed discount of {MAX_CAMPAIGN_DISCOUNT_PCT}%"
+            f"campaign discount {pct}% exceeds maximum allowed merchant campaign discount of {max_campaign_discount_pct}%"
         )
         return _rejected(violations)
 
-    # ── Reject campaigns exceeding MAX_CAMPAIGN_DURATION_HOURS ──
-    if duration > MAX_CAMPAIGN_DURATION_HOURS:
+    # ── Reject campaigns exceeding max_campaign_duration_hours ──
+    if duration > max_campaign_duration_hours:
         violations.append(
-            f"campaign duration {duration}h exceeds maximum allowed duration of {MAX_CAMPAIGN_DURATION_HOURS}h"
+            f"campaign duration {duration}h exceeds maximum allowed merchant duration of {max_campaign_duration_hours}h"
         )
         return _rejected(violations)
 
@@ -166,12 +184,12 @@ def evaluate_campaign_proposal(proposal: dict, catalog: list[dict] | None = None
             )
             skus = [s for s in skus if s in catalog_ids]
     else:
-        non_discountable = [s for s in skus if s not in DISCOUNTABLE_SKUS]
+        non_discountable = [s for s in skus if s not in discountable_skus]
         if non_discountable:
             violations.append(
                 f"campaign targets non-discountable SKU(s): {', '.join(non_discountable)}"
             )
-            skus = [s for s in skus if s in DISCOUNTABLE_SKUS]
+            skus = [s for s in skus if s in discountable_skus]
 
     # ── Reject if no valid SKUs remain ──
     if not skus and pct > 0:
@@ -184,7 +202,7 @@ def evaluate_campaign_proposal(proposal: dict, catalog: list[dict] | None = None
         "target_skus": skus,
         "duration_hours": duration,
     }
-    needs_approval = pct > AUTO_APPROVE_THRESHOLD_PCT
+    needs_approval = pct > auto_approve_threshold_pct
 
     if violations:
         if needs_approval:
@@ -198,19 +216,7 @@ def evaluate_campaign_proposal(proposal: dict, catalog: list[dict] | None = None
 
 def calculate_final_amount(cart: list[dict], approved_action: dict,
                            catalog: list[dict]) -> dict:
-    """Calculate the authoritative payable amount server-side.
-
-    NEVER trust the frontend for amount calculation.
-
-    Args:
-        cart: list of {"sku": str, "quantity": int}
-        approved_action: the final_action from the policy result
-        catalog: list of product dicts from the database
-
-    Returns:
-        dict with original_amount_paise, final_amount_paise,
-        discount_amount_paise, discount_pct
-    """
+    """Calculate payable amount server-side."""
     catalog_map = {p["id"]: p for p in catalog}
 
     original_total = 0
@@ -223,10 +229,8 @@ def calculate_final_amount(cart: list[dict], approved_action: dict,
     discount_amount = int(original_total * discount_pct / 100)
     final_amount = original_total - discount_amount
 
-    # Safety: never produce negative or zero payable amount
     if final_amount < 0:
         final_amount = 0
-    # If discount was rejected, final equals original
     if discount_pct == 0:
         discount_amount = 0
         final_amount = original_total
@@ -238,10 +242,6 @@ def calculate_final_amount(cart: list[dict], approved_action: dict,
         "discount_pct": discount_pct,
     }
 
-
-# ═══════════════════════════════════════════════════════════════════════
-# Internal helpers
-# ═══════════════════════════════════════════════════════════════════════
 
 def _approved(violations: list, final_action: dict) -> dict:
     return {

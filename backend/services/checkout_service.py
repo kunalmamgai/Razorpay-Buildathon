@@ -1,36 +1,29 @@
-"""Checkout service — orchestrates the Brain → Cage → Razorpay pipeline.
-
-This is the core business logic that the checkout routes delegate to.
-It keeps routes thin and logic testable.
+"""Checkout service — orchestrates Brain → Cage → Razorpay pipeline with multi-tenant merchant isolation.
 """
 import json
 import uuid
 import logging
 from typing import Optional
 
-from backend.db import get_db
+from backend.db import get_db, get_connection
 from backend.brain.gemini_agent import propose_upsell
 from backend.cage.policy_engine import evaluate_upsell_proposal, calculate_final_amount
-from backend.config import RAZORPAY_KEY_ID
+from backend.merchant_manager import get_merchant
 from backend.ledger.ledger import log_entry, get_entry_by_id
-from backend.razorpay_client import sync_create_order, sync_verify_payment_signature
+from backend.razorpay_client import sync_create_order, resolve_merchant_credentials
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("marlin.checkout_service")
 
 
-def get_catalog() -> list[dict]:
-    """Fetch all products from the database."""
-    with get_db() as conn:
+def get_catalog(merchant_id: str = "merchant_default") -> list[dict]:
+    """Fetch all products from the isolated merchant database."""
+    with get_db(merchant_id) as conn:
         rows = conn.execute("SELECT * FROM products").fetchall()
         return [dict(row) for row in rows]
 
 
-def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
-    """Restore the amount snapshot persisted at proposal time.
-
-    The order total MUST match exactly what the shopper was shown when the
-    proposal was made — it is never recomputed from SKUs after the fact.
-    """
+def _amounts_from_snapshot(entry: dict, final_action: dict, merchant_id: str = "merchant_default") -> dict:
+    """Restore amount snapshot persisted at proposal time."""
     raw = entry.get("amounts_json")
     if raw:
         try:
@@ -46,9 +39,7 @@ def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
         except (json.JSONDecodeError, TypeError):
             pass
 
-    # Legacy fallback for entries created before snapshots existed.
-    # Use cart_json (all items) for the original total, not just proposal SKUs.
-    catalog = get_catalog()
+    catalog = get_catalog(merchant_id)
     catalog_map = {p["id"]: p for p in catalog}
     original_total = 0
     cart_raw = entry.get("cart_json")
@@ -63,14 +54,14 @@ def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
                     original_total += product["price"] * qty
         except (json.JSONDecodeError, TypeError):
             pass
-    # Fallback: if cart_json was empty or missing, use proposal SKUs
+
     if original_total == 0:
         for sku in final_action.get("skus", []):
             product = catalog_map.get(sku)
             if product:
                 original_total += product["price"]
     if original_total == 0:
-        original_total = 100000  # ₹1,000 fallback
+        original_total = 100000
 
     discount_pct = final_action.get("discount_pct", 0)
     discount_amount = int(original_total * discount_pct / 100)
@@ -87,9 +78,9 @@ def _amounts_from_snapshot(entry: dict, final_action: dict) -> dict:
     }
 
 
-def _ensure_offer_not_invalidated(offer_id: str) -> None:
+def _ensure_offer_not_invalidated(offer_id: str, merchant_id: str = "merchant_default") -> None:
     """Reject checkout if this offer was already used by a failed payment."""
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         existing = conn.execute(
             "SELECT status FROM orders WHERE offer_id = ?", (offer_id,)
         ).fetchone()
@@ -100,27 +91,28 @@ def _ensure_offer_not_invalidated(offer_id: str) -> None:
             )
 
 
-def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> dict:
-    """Step 1: Brain proposes → Cage evaluates → store pending result.
-
-    Does NOT create a Razorpay order yet. Returns the proposal and
-    policy result for the frontend to display.
-    """
+def propose_checkout(
+    cart: list[dict],
+    idempotency_key: str | None = None,
+    merchant_id: str = "merchant_default",
+) -> dict:
+    """Step 1: Brain proposes → Cage evaluates (using merchant policies) → store pending result."""
     if idempotency_key is None:
         idempotency_key = f"idem_{uuid.uuid4().hex[:16]}"
 
     correlation_id = f"corr_{uuid.uuid4().hex[:12]}"
+    merchant_info = get_merchant(merchant_id)
+    policy_config = merchant_info.get("policy_config", {})
 
-    catalog = get_catalog()
+    catalog = get_catalog(merchant_id)
     catalog_map = {p["id"]: p for p in catalog}
 
-    # Build cart detail with authoritative prices from DB
     cart_detail = []
     original_total = 0
     for item in cart:
         product = catalog_map.get(item["sku"])
         if not product:
-            raise ValueError(f"Unknown SKU: {item['sku']}")
+            raise ValueError(f"Unknown SKU: {item['sku']} for merchant '{merchant_id}'")
         line_total = product["price"] * item.get("quantity", 1)
         cart_detail.append({
             "sku": item["sku"],
@@ -134,17 +126,16 @@ def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> di
     # Brain proposes
     proposal = propose_upsell(cart_detail, catalog)
 
-    # Cage evaluates
-    policy_result = evaluate_upsell_proposal(proposal, catalog)
+    # Cage evaluates using merchant's policy rules
+    policy_result = evaluate_upsell_proposal(proposal, catalog, policy_config=policy_config)
 
-    # Calculate amounts server-side (NEVER trust frontend)
+    # Calculate amounts server-side
     final_action = policy_result.get("final_action", {})
     amounts = calculate_final_amount(cart, final_action, catalog)
 
-    # Determine outcome
     decision = policy_result["decision"]
 
-    # Log the proposal to ledger (with the authoritative amount snapshot)
+    # Log entry to merchant's isolated ledger
     entry_id = log_entry(
         correlation_id=correlation_id,
         event_type="checkout_proposal",
@@ -156,7 +147,10 @@ def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> di
         idempotency_key=idempotency_key,
         outcome=decision,
         amounts=amounts,
+        merchant_id=merchant_id,
     )
+
+    key_id, _, _ = resolve_merchant_credentials(merchant_id)
 
     return {
         "entry_id": entry_id,
@@ -167,33 +161,25 @@ def propose_checkout(cart: list[dict], idempotency_key: str | None = None) -> di
         "final_amount_paise": amounts["final_amount_paise"],
         "discount_amount_paise": amounts["discount_amount_paise"],
         "discount_pct": amounts["discount_pct"],
-        "razorpay_key_id": None,  # Only provided when creating order
+        "razorpay_key_id": key_id,
         "idempotency_key": idempotency_key,
+        "merchant_id": merchant_id,
     }
 
 
-def approve_checkout(ledger_id: int) -> dict:
-    """Step 2: Merchant approves a pending proposal.
-
-    Updates the ledger entry and creates the Razorpay order.
-    A proposal requiring approval MUST NOT create a Razorpay order until this succeeds.
-    """
-    entry = get_entry_by_id(ledger_id)
+def approve_checkout(ledger_id: int, merchant_id: str = "merchant_default") -> dict:
+    """Step 2: Merchant approves a pending proposal in their isolated DB."""
+    entry = get_entry_by_id(ledger_id, merchant_id=merchant_id)
     if not entry:
-        raise ValueError(f"Ledger entry {ledger_id} not found")
+        raise ValueError(f"Ledger entry {ledger_id} not found for merchant '{merchant_id}'")
 
     if entry["outcome"] != "awaiting_approval":
         raise ValueError(f"Entry {ledger_id} is not awaiting approval (current: {entry['outcome']})")
 
-    # Check if already approved (idempotency guard)
     if entry.get("approval_status") == "approved":
         raise ValueError(f"Entry {ledger_id} has already been approved")
 
-    # Update ledger with approval using BEGIN IMMEDIATE to prevent race condition
-    from backend.db import get_connection
-    from datetime import datetime
-    with get_connection() as conn:
-        # Use BEGIN IMMEDIATE to acquire an exclusive lock and prevent double-approval
+    with get_connection(merchant_id) as conn:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT id FROM ledger WHERE id = ? AND (approval_status IS NULL OR approval_status != 'approved')",
@@ -202,31 +188,27 @@ def approve_checkout(ledger_id: int) -> dict:
         if not row:
             conn.execute("ROLLBACK")
             raise ValueError(f"Entry {ledger_id} has already been approved")
+        
+        from datetime import datetime
         conn.execute(
             "UPDATE ledger SET approval_status = ?, approval_actor = ?, approval_timestamp = ? WHERE id = ?",
             ("approved", "merchant", datetime.utcnow().isoformat(), ledger_id),
         )
         conn.execute("COMMIT")
 
-    # Now create the Razorpay order
     final_action = json.loads(entry["final_action_json"]) if entry["final_action_json"] else {}
     proposal = json.loads(entry["proposal_json"]) if entry["proposal_json"] else {}
     correlation_id = entry["correlation_id"]
 
-    # Amounts come from the snapshot taken at proposal time — identical to
-    # what the shopper was shown. Never recomputed here.
-    resolved = _amounts_from_snapshot(entry, final_action)
+    resolved = _amounts_from_snapshot(entry, final_action, merchant_id=merchant_id)
     original_total = resolved["original_total"]
     final_amount = resolved["final_amount"]
-    discount_amount = resolved["discount_amount"]
     discount_pct = resolved["discount_pct"]
     cart_skus = final_action.get("skus", proposal.get("skus", []))
 
-    # Check for reused invalidated offers
     offer_id = f"offer_{correlation_id}"
-    _ensure_offer_not_invalidated(offer_id)
+    _ensure_offer_not_invalidated(offer_id, merchant_id=merchant_id)
 
-    # Create Razorpay order
     idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
     order_data = sync_create_order(
         final_amount,
@@ -236,10 +218,10 @@ def approve_checkout(ledger_id: int) -> dict:
             "offer_id": offer_id,
             "discount_pct": str(discount_pct),
         },
+        merchant_id=merchant_id,
     )
 
-    # Store order in DB
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         conn.execute(
             """INSERT INTO orders
                (id, razorpay_order_id, cart_json, original_amount, final_amount,
@@ -257,7 +239,6 @@ def approve_checkout(ledger_id: int) -> dict:
             ),
         )
 
-    # Log order creation to ledger
     log_entry(
         correlation_id=correlation_id,
         event_type="order_created",
@@ -270,27 +251,31 @@ def approve_checkout(ledger_id: int) -> dict:
         idempotency_key=idempotency_key,
         outcome="order_created",
         approval_status="approved",
+        merchant_id=merchant_id,
     )
+
+    key_id, _, _ = resolve_merchant_credentials(merchant_id)
 
     return {
         "entry_id": ledger_id,
         "correlation_id": correlation_id,
         "order_id": order_data["id"],
-        "razorpay_key_id": RAZORPAY_KEY_ID or None,
+        "razorpay_key_id": key_id,
         "final_amount_paise": final_amount,
         "discount_pct": discount_pct,
+        "merchant_id": merchant_id,
     }
 
 
-def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = None) -> dict:
-    """Step 3: Create Razorpay order for auto-approved proposals.
-
-    For proposals that don't need approval (decision == "approved" or "clamped"),
-    create the order directly.
-    """
-    entry = get_entry_by_id(ledger_id)
+def create_order_from_proposal(
+    ledger_id: int,
+    idempotency_key: str | None = None,
+    merchant_id: str = "merchant_default",
+) -> dict:
+    """Step 3: Create Razorpay order for auto-approved proposals in isolated DB."""
+    entry = get_entry_by_id(ledger_id, merchant_id=merchant_id)
     if not entry:
-        raise ValueError(f"Ledger entry {ledger_id} not found")
+        raise ValueError(f"Ledger entry {ledger_id} not found for merchant '{merchant_id}'")
 
     if entry["outcome"] not in ("approved", "clamped"):
         raise ValueError(
@@ -302,16 +287,15 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
     final_action = json.loads(entry["final_action_json"]) if entry["final_action_json"] else {}
     proposal = json.loads(entry["proposal_json"]) if entry["proposal_json"] else {}
 
-    # Amounts come from the snapshot taken at proposal time — identical to
-    # what the shopper was shown. Never recomputed here.
-    resolved = _amounts_from_snapshot(entry, final_action)
+    resolved = _amounts_from_snapshot(entry, final_action, merchant_id=merchant_id)
     original_total = resolved["original_total"]
     final_amount = resolved["final_amount"]
     discount_pct = resolved["discount_pct"]
     cart_skus = final_action.get("skus", proposal.get("skus", []))
 
     offer_id = f"offer_{correlation_id}"
-    _ensure_offer_not_invalidated(offer_id)
+    _ensure_offer_not_invalidated(offer_id, merchant_id=merchant_id)
+
     if idempotency_key is None:
         idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
 
@@ -323,9 +307,10 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
             "offer_id": offer_id,
             "discount_pct": str(discount_pct),
         },
+        merchant_id=merchant_id,
     )
 
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         conn.execute(
             """INSERT INTO orders
                (id, razorpay_order_id, cart_json, original_amount, final_amount,
@@ -355,13 +340,17 @@ def create_order_from_proposal(ledger_id: int, idempotency_key: str | None = Non
         idempotency_key=idempotency_key,
         outcome="order_created",
         approval_status="auto_approved",
+        merchant_id=merchant_id,
     )
+
+    key_id, _, _ = resolve_merchant_credentials(merchant_id)
 
     return {
         "entry_id": ledger_id,
         "correlation_id": correlation_id,
         "order_id": order_data["id"],
-        "razorpay_key_id": RAZORPAY_KEY_ID or None,
+        "razorpay_key_id": key_id,
         "final_amount_paise": final_amount,
         "discount_pct": discount_pct,
+        "merchant_id": merchant_id,
     }

@@ -1,8 +1,32 @@
 const API_BASE = `${import.meta.env.VITE_API_URL || ''}/api`
 
+export function getActiveMerchant() {
+  try {
+    return sessionStorage.getItem('marlin_active_merchant') || 'merchant_default'
+  } catch (e) {
+    return 'merchant_default'
+  }
+}
+
+export function setActiveMerchant(merchantId) {
+  try {
+    sessionStorage.setItem('marlin_active_merchant', merchantId)
+    window.dispatchEvent(new Event('marlin_merchant_changed'))
+  } catch (e) {
+    console.error(e)
+  }
+}
+
 async function request(path, options = {}) {
+  const activeMerchant = getActiveMerchant()
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Merchant-ID': activeMerchant,
+    ...options.headers,
+  }
+
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...options.headers },
+    headers,
     ...options,
   })
   if (!res.ok) {
@@ -11,6 +35,10 @@ async function request(path, options = {}) {
   }
   return res.json()
 }
+
+// ── Merchants ─────────────────────────────────────────────
+export const fetchMerchants = () => request('/merchants')
+export const fetchCurrentMerchantInfo = () => request('/merchants/current')
 
 // ── Products ──────────────────────────────────────────────
 export const fetchProducts = () => request('/products')

@@ -1,15 +1,27 @@
-"""SQLite database — connection management and schema creation.
+"""SQLite database — connection management, per-merchant database isolation, and schema creation.
 
 Schema is insert-only for ledger (no erasing rejected proposals).
-Every table includes timestamps for auditability.
+Every table includes timestamps and tenant isolation.
 """
 import sqlite3
+from pathlib import Path
 from contextlib import contextmanager
 import backend.config as _config
 
+MERCHANTS_DIR = _config.DATA_DIR / "merchants"
+MERCHANTS_DIR.mkdir(exist_ok=True, parents=True)
 
-def get_connection() -> sqlite3.Connection:
-    conn = sqlite3.connect(_config.DATABASE_URL)
+
+def get_merchant_db_path(merchant_id: str = "merchant_default") -> Path:
+    """Get isolated database file path for a specific merchant."""
+    safe_id = "".join(c for c in merchant_id if c.isalnum() or c in ("_", "-")) or "merchant_default"
+    return MERCHANTS_DIR / f"{safe_id}.db"
+
+
+def get_connection(merchant_id: str = "merchant_default") -> sqlite3.Connection:
+    """Get SQLite connection to a merchant's isolated database file."""
+    db_path = get_merchant_db_path(merchant_id)
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA foreign_keys=ON")
@@ -17,8 +29,9 @@ def get_connection() -> sqlite3.Connection:
 
 
 @contextmanager
-def get_db():
-    conn = get_connection()
+def get_db(merchant_id: str = "merchant_default"):
+    """Context manager for merchant database operations."""
+    conn = get_connection(merchant_id)
     try:
         yield conn
         conn.commit()
@@ -26,9 +39,9 @@ def get_db():
         conn.close()
 
 
-def init_db():
-    """Create all tables if they don't exist."""
-    with get_db() as conn:
+def init_db(merchant_id: str = "merchant_default"):
+    """Create all tables in the specified merchant's isolated database if they don't exist."""
+    with get_db(merchant_id) as conn:
         conn.executescript(
             """
             CREATE TABLE IF NOT EXISTS products (
@@ -105,7 +118,16 @@ def init_db():
             """
         )
     # Lightweight migration for pre-existing databases
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         cols = [row[1] for row in conn.execute("PRAGMA table_info(ledger)").fetchall()]
         if "amounts_json" not in cols:
             conn.execute("ALTER TABLE ledger ADD COLUMN amounts_json TEXT DEFAULT NULL")
+
+
+def init_all_merchants_db():
+    """Initialize databases for all registered merchants."""
+    from backend.merchant_manager import list_merchants, init_master_db
+    init_master_db()
+    merchants = list_merchants()
+    for m in merchants:
+        init_db(m["merchant_id"])

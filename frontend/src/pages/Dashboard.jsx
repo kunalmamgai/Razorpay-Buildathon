@@ -130,7 +130,12 @@ export default function Dashboard() {
   useEffect(() => {
     refreshLedger()
     const timer = setInterval(() => refreshLedger(true), LEDGER_POLL_MS)
-    return () => clearInterval(timer)
+    const handleMerchantChange = () => refreshLedger()
+    window.addEventListener('marlin_merchant_changed', handleMerchantChange)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener('marlin_merchant_changed', handleMerchantChange)
+    }
   }, [filter])
 
   const refreshCampaigns = async () => {

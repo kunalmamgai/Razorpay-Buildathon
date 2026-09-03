@@ -1,46 +1,35 @@
-"""Payment service — handles payment verification, webhooks, and failure recovery.
-
-SAFEGUARDS:
-- Does not trust frontend payment success alone
-- Verifies Razorpay payment signatures server-side
-- Makes webhook processing idempotent
-- Does not silently reuse invalidated discounts after payment failure
-- Creates new retry orders instead of reusing failed ones
-"""
+"""Payment service — handles payment verification, webhooks, and failure recovery with merchant DB isolation."""
 import json
 import logging
 from backend.db import get_db
 from backend.ledger.ledger import log_entry, update_outcome, get_entries_by_order
 from backend.razorpay_client import sync_verify_payment_signature as verify_payment_signature
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("marlin.payment_service")
 
 
-def verify_and_record_payment(order_id: str, payment_id: str, signature: str) -> dict:
-    """Verify Razorpay payment signature and record the result.
-
-    Does NOT trust the frontend — always verifies server-side.
-    """
-    # Verify signature
-    is_valid = verify_payment_signature(payment_id, order_id, signature)
+def verify_and_record_payment(
+    order_id: str,
+    payment_id: str,
+    signature: str,
+    merchant_id: str = "merchant_default",
+) -> dict:
+    """Verify Razorpay payment signature and record result in active merchant DB."""
+    is_valid = verify_payment_signature(payment_id, order_id, signature, merchant_id=merchant_id)
 
     if not is_valid:
-        # Invalid signature — reject
-        _record_failure(order_id, payment_id, "INVALID_SIGNATURE", "Payment signature verification failed")
+        _record_failure(order_id, payment_id, "INVALID_SIGNATURE", "Payment signature verification failed", merchant_id=merchant_id)
         return {"status": "rejected", "reason": "Invalid payment signature"}
 
-    # Signature valid — record payment
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         order = conn.execute(
             "SELECT * FROM orders WHERE razorpay_order_id = ?", (order_id,)
         ).fetchone()
 
         if not order:
-            return {"status": "error", "reason": f"Order {order_id} not found"}
+            return {"status": "error", "reason": f"Order {order_id} not found for merchant '{merchant_id}'"}
 
         order_dict = dict(order)
-
-        # Idempotent: if already paid, don't double-record
         if order_dict["status"] == "paid":
             return {"status": "already_processed", "outcome": "paid"}
 
@@ -51,8 +40,7 @@ def verify_and_record_payment(order_id: str, payment_id: str, signature: str) ->
             (payment_id, order_id),
         )
 
-    # Log to ledger
-    correlation_id = _get_correlation_for_order(order_id)
+    correlation_id = _get_correlation_for_order(order_id, merchant_id=merchant_id)
     log_entry(
         correlation_id=correlation_id,
         event_type="payment_captured",
@@ -62,21 +50,20 @@ def verify_and_record_payment(order_id: str, payment_id: str, signature: str) ->
         razorpay_order_id=order_id,
         razorpay_payment_id=payment_id,
         outcome="paid",
+        merchant_id=merchant_id,
     )
 
-    return {"status": "paid", "order_id": order_id, "payment_id": payment_id}
+    return {"status": "paid", "order_id": order_id, "payment_id": payment_id, "merchant_id": merchant_id}
 
 
-def process_webhook(event: str, payload: dict, raw_body: bytes = None,
-                    webhook_signature: str = None) -> dict:
-    """Process a Razorpay webhook event.
-
-    Idempotent — duplicate webhooks don't create duplicate records.
-    """
-    # Note: webhook signature is already verified by the route handler.
-    # No redundant verification needed here.
-
-    # Extract entities from Razorpay webhook format
+def process_webhook(
+    event: str,
+    payload: dict,
+    raw_body: bytes = None,
+    webhook_signature: str = None,
+    merchant_id: str = "merchant_default",
+) -> dict:
+    """Process a Razorpay webhook event for a merchant DB."""
     order_entity = payload.get("payload", {}).get("order", {}).get("entity", {})
     payment_entity = payload.get("payload", {}).get("payment", {}).get("entity", {})
 
@@ -95,15 +82,13 @@ def process_webhook(event: str, payload: dict, raw_body: bytes = None,
     else:
         return {"status": "ignored", "reason": f"Unhandled event: {event}"}
 
-    # Idempotent: check current status
-    with get_db() as conn:
+    with get_db(merchant_id) as conn:
         order = conn.execute(
             "SELECT status FROM orders WHERE razorpay_order_id = ?", (order_id,)
         ).fetchone()
 
         if order:
             current_status = dict(order)["status"]
-            # Already in this state — skip
             if current_status == order_status:
                 return {"status": "already_processed", "outcome": outcome}
 
@@ -114,11 +99,10 @@ def process_webhook(event: str, payload: dict, raw_body: bytes = None,
             (payment_id, order_status, order_id),
         )
 
-    # Handle payment failure — invalidate the offer
     if outcome == "failed":
-        _handle_payment_failure(order_id, payment_id)
+        _handle_payment_failure(order_id, payment_id, merchant_id=merchant_id)
 
-    correlation_id = _get_correlation_for_order(order_id)
+    correlation_id = _get_correlation_for_order(order_id, merchant_id=merchant_id)
     log_entry(
         correlation_id=correlation_id,
         event_type="payment_webhook",
@@ -128,26 +112,21 @@ def process_webhook(event: str, payload: dict, raw_body: bytes = None,
         razorpay_order_id=order_id,
         razorpay_payment_id=payment_id,
         outcome=outcome,
+        merchant_id=merchant_id,
     )
 
-    return {"status": "processed", "outcome": outcome}
+    return {"status": "processed", "outcome": outcome, "merchant_id": merchant_id}
 
 
-def simulate_payment_failure(order_id: str) -> dict:
-    """Simulate a payment failure for demo purposes.
-
-    1. Marks the order as PAYMENT_FAILED
-    2. Records the failure in the ledger
-    3. Marks the offer as INVALIDATED
-    4. Prevents reuse of the same offer ID
-    """
-    with get_db() as conn:
+def simulate_payment_failure(order_id: str, merchant_id: str = "merchant_default") -> dict:
+    """Simulate a payment failure for demo purposes in active merchant DB."""
+    with get_db(merchant_id) as conn:
         order = conn.execute(
             "SELECT * FROM orders WHERE razorpay_order_id = ?", (order_id,)
         ).fetchone()
 
         if not order:
-            raise ValueError(f"Order {order_id} not found")
+            raise ValueError(f"Order {order_id} not found for merchant '{merchant_id}'")
 
         order_dict = dict(order)
         offer_id = order_dict.get("offer_id")
@@ -159,9 +138,8 @@ def simulate_payment_failure(order_id: str) -> dict:
             (order_id,),
         )
 
-    correlation_id = _get_correlation_for_order(order_id)
+    correlation_id = _get_correlation_for_order(order_id, merchant_id=merchant_id)
 
-    # Log the failure
     log_entry(
         correlation_id=correlation_id,
         event_type="payment_failed",
@@ -172,9 +150,9 @@ def simulate_payment_failure(order_id: str) -> dict:
         outcome="failed",
         error_code="SIMULATED_FAILURE",
         error_message="Payment failed in test mode. The offer has been invalidated.",
+        merchant_id=merchant_id,
     )
 
-    # Log recovery
     log_entry(
         correlation_id=correlation_id,
         event_type="recovery",
@@ -187,6 +165,7 @@ def simulate_payment_failure(order_id: str) -> dict:
         ),
         razorpay_order_id=order_id,
         outcome="reverted",
+        merchant_id=merchant_id,
     )
 
     return {
@@ -194,16 +173,30 @@ def simulate_payment_failure(order_id: str) -> dict:
         "outcome": "failed",
         "order_id": order_id,
         "offer_id": offer_id,
-        "message": (
-            f"Payment failure simulated for order {order_id}. "
-            "The offer has been invalidated and cannot be reused."
-        ),
+        "merchant_id": merchant_id,
+        "message": f"Payment failure simulated for order {order_id} (Merchant: {merchant_id}).",
     }
 
 
-def _handle_payment_failure(order_id: str, payment_id: str):
-    """Handle a real payment failure — invalidate the offer."""
-    with get_db() as conn:
+def _record_failure(order_id: str, payment_id: str, code: str, msg: str, merchant_id: str = "merchant_default"):
+    correlation_id = _get_correlation_for_order(order_id, merchant_id=merchant_id)
+    log_entry(
+        correlation_id=correlation_id,
+        event_type="payment_verification_failed",
+        actor="razorpay",
+        trigger="payment_verification",
+        reasoning=msg,
+        razorpay_order_id=order_id,
+        razorpay_payment_id=payment_id,
+        outcome="failed",
+        error_code=code,
+        error_message=msg,
+        merchant_id=merchant_id,
+    )
+
+
+def _handle_payment_failure(order_id: str, payment_id: str, merchant_id: str = "merchant_default"):
+    with get_db(merchant_id) as conn:
         order = conn.execute(
             "SELECT offer_id FROM orders WHERE razorpay_order_id = ?", (order_id,)
         ).fetchone()
@@ -211,12 +204,11 @@ def _handle_payment_failure(order_id: str, payment_id: str):
         if order:
             offer_id = dict(order).get("offer_id")
             if offer_id:
-                logger.info(f"Offer {offer_id} invalidated due to payment failure")
+                logger.info(f"Offer {offer_id} invalidated for merchant {merchant_id}")
 
 
-def _get_correlation_for_order(order_id: str) -> str:
-    """Look up the correlation_id for an order from its ledger entries."""
-    entries = get_entries_by_order(order_id)
+def _get_correlation_for_order(order_id: str, merchant_id: str = "merchant_default") -> str:
+    entries = get_entries_by_order(order_id, merchant_id=merchant_id)
     if entries:
         return entries[0].get("correlation_id", f"corr_{order_id}")
     return f"corr_{order_id}"
