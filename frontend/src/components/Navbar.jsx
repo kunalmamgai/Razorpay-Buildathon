@@ -7,10 +7,11 @@ export default function Navbar({ cartCount = 0 }) {
   const location = useLocation()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [merchants, setMerchants] = useState([
-    { merchant_id: 'merchant_default', name: 'Marlin Store (Default)' },
+    { merchant_id: 'merchant_default', name: 'RazorCage Store (Default)' },
     { merchant_id: 'apex_electronics', name: 'Apex Electronics' },
     { merchant_id: 'nexus_fashion', name: 'Nexus Luxury Fashion' },
   ])
+
   const [activeMerchantId, setActiveMerchantId] = useState(getActiveMerchant())
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function Navbar({ cartCount = 0 }) {
             </span>
             <div className="flex flex-col">
               <span className="font-bold text-white tracking-tight flex items-center gap-1.5 text-base">
-                Marlin <span className="text-xs uppercase font-semibold tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.2 rounded">Intelligence</span>
+                RazorCage <span className="text-xs uppercase font-semibold tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/30 px-1.5 py-0.2 rounded">Intelligence</span>
               </span>
               <span className="text-xs text-gray-400 hidden lg:inline">Explainable & Bounded AI</span>
             </div>

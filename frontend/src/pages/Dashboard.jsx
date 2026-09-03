@@ -416,7 +416,7 @@ export default function Dashboard() {
       <footer className="border-t border-gray-800 bg-[#07090e] py-6 px-6 text-center text-xs text-gray-500 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-[11px] text-gray-400">
-            Marlin Growth Agent &middot; Razorpay AI Commerce Hackathon
+            RazorCage AI &middot; Razorpay AI Commerce Hackathon
           </span>
           <span className="text-[10px] text-gray-500 font-mono">
             Every transaction bounded & immutably logged.

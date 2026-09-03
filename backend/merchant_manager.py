@@ -17,7 +17,7 @@ MERCHANTS_DIR.mkdir(exist_ok=True, parents=True)
 DEFAULT_MERCHANTS = [
     {
         "merchant_id": "merchant_default",
-        "name": "Marlin Store (Default)",
+        "name": "RazorCage Store (Default)",
         "description": "Standard e-commerce demo with default 20% max discount limit",
         "razorpay_key_id": _config.RAZORPAY_KEY_ID,
         "razorpay_key_secret": _config.RAZORPAY_KEY_SECRET,

@@ -37,7 +37,7 @@ export default function Onboarding() {
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse" />
           <span className="text-xs font-semibold tracking-widest text-cyan-400 uppercase">
-            MARLIN INTELLIGENCE
+            RAZORCAGE INTELLIGENCE
           </span>
         </div>
         <button
@@ -53,7 +53,7 @@ export default function Onboarding() {
       <main className="max-w-6xl mx-auto px-6 pt-4 pb-16 flex-1 flex flex-col justify-center z-10 w-full">
         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight mb-4">
-            How Marlin Keeps AI Honest
+            How RazorCage Keeps AI Honest
           </h1>
           <p className="text-gray-400 text-sm sm:text-base md:text-lg leading-relaxed font-normal">
             Our three-layer safety model ensures every AI action is proposed intelligently,

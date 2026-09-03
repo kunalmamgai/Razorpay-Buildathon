@@ -132,7 +132,7 @@ export default function AuditLogs() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
-              Marlin Audit Ledger
+              RazorCage Audit Ledger
               {isDemoData && (
                 <span className="text-xs font-mono font-semibold text-blue-300 bg-blue-950/80 border border-blue-500/30 px-2.5 py-1 rounded-full">
                   [Demo Sample Mode]

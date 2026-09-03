@@ -49,7 +49,7 @@ export default function Approvals() {
       <footer className="border-t border-gray-800 bg-[#07090e] py-6 px-6 text-center text-xs text-gray-500 mt-12">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-[11px] text-gray-400">
-            Marlin Human-in-the-Loop Gatekeeper &middot; Merchant Override Panel
+            RazorCage Human-in-the-Loop Gatekeeper &middot; Merchant Override Panel
           </span>
           <span className="text-[10px] text-gray-500 font-mono">
             Every merchant override cryptographically signed to audit ledger.

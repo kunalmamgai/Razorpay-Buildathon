@@ -197,7 +197,7 @@ export default function Storefront() {
       key: orderData.razorpay_key_id,
       amount: orderData.final_amount_paise,
       currency: 'INR',
-      name: 'Marlin Store',
+      name: 'RazorCage Store',
       order_id: orderData.order_id,
       handler: async (response) => {
         try {
@@ -212,7 +212,7 @@ export default function Storefront() {
           setCheckoutState(prev => ({ ...prev, state: 'failed' }))
         }
       },
-      prefill: { name: 'Demo Customer', email: 'demo@marlin.ai' },
+      prefill: { name: 'Demo Customer', email: 'demo@razorcage.ai' },
       theme: { color: '#3B82F6' },
       modal: {
         ondismiss: () => {
@@ -266,7 +266,7 @@ export default function Storefront() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 <BrainCircuit className="w-4 h-4 text-cyan-400" />
-                Marlin 4-Layer Safety Framework
+                RazorCage 4-Layer Safety Framework
               </h3>
               <button onClick={() => setShowExplainer(false)} className="text-gray-400 hover:text-white">
                 <X className="w-4 h-4" />

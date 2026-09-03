@@ -114,7 +114,7 @@ app.include_router(analytics_router)
 @app.get("/")
 def root():
     return {
-        "name": "Marlin Growth Agent (Multi-Tenant)",
+        "name": "RazorCage AI (Multi-Tenant)",
         "version": "1.1.0",
         "description": "Explainable & Bounded AI Commerce — Razorpay Hackathon",
         "docs": "/docs",
