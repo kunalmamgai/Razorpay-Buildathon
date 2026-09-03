@@ -1,7 +1,7 @@
 """SQLite database — connection management, per-merchant database isolation, and schema creation.
 
 Schema is insert-only for ledger (no erasing rejected proposals).
-Every table includes timestamps and tenant isolation.
+Includes webhook idempotency deduplication & dead-letter queue (DLQ) tables.
 """
 import sqlite3
 from pathlib import Path
@@ -115,6 +115,32 @@ def init_db(merchant_id: str = "merchant_default"):
                 created_by TEXT DEFAULT 'system',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS webhook_idempotency (
+                event_id TEXT PRIMARY KEY,
+                merchant_id TEXT NOT NULL,
+                event_type TEXT,
+                status TEXT NOT NULL,
+                response_json TEXT,
+                error_message TEXT,
+                processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE TABLE IF NOT EXISTS dlq_webhooks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT NOT NULL,
+                merchant_id TEXT NOT NULL,
+                event_type TEXT,
+                raw_payload_json TEXT NOT NULL,
+                error_message TEXT,
+                attempts INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_webhook_idem_merchant ON webhook_idempotency(merchant_id, status);
+            CREATE INDEX IF NOT EXISTS idx_dlq_merchant_status ON dlq_webhooks(merchant_id, status);
             """
         )
     # Lightweight migration for pre-existing databases
