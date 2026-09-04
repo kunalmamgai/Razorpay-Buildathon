@@ -1,4 +1,4 @@
-# Marlin Growth Agent
+# RazorCage Growth Agent
 
 ![Python 3.11](https://img.shields.io/badge/python-3.11-blue?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green?logo=fastapi&logoColor=white)
@@ -14,7 +14,7 @@ An AI-powered merchant revenue growth agent that automatically proposes upsell b
 
 ## Why This Exists
 
-Most merchants grow revenue through manual, occasional decisions — a human looks at a dashboard once a week and decides to run a discount. Marlin demonstrates what happens when a bounded AI agent makes these decisions continuously, in real time, for every transaction — without becoming an unaccountable black box.
+Most merchants grow revenue through manual, occasional decisions — a human looks at a dashboard once a week and decides to run a discount. RazorCage demonstrates what happens when a bounded AI agent makes these decisions continuously, in real time, for every transaction — without becoming an unaccountable black box.
 
 The real engineering problem isn't "can an LLM suggest a discount" — it's **the moment an AI touches real money, the problem shifts from making it smart to making it safe and legible.**
 
