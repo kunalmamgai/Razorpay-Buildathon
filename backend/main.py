@@ -83,9 +83,11 @@ app = FastAPI(
 
 add_rate_limiting(app)
 
+# backend/main.py — CORSMiddleware block
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=r"https://razorpay-buildathon-vm99.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
