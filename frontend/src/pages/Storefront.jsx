@@ -1,93 +1,73 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   ShoppingBag, Trash2, Plus, Minus,
   ShieldCheck, Zap, ArrowRight, Loader2, Info, X,
-  BrainCircuit, ShieldAlert, BookOpen, CheckCircle2, AlertCircle, Play
+  BrainCircuit, ShieldAlert, BookOpen, CheckCircle2, AlertCircle, Play, Star, Flame
 } from 'lucide-react'
-import { fetchProducts, proposeCheckout, approveCheckout, createOrder, verifyPayment } from '../api'
+import { fetchProducts, fetchCampaigns, proposeCheckout, approveCheckout, createOrder, verifyPayment } from '../api'
 import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
 import Navbar from '../components/Navbar'
+import LiveDealsStrip from '../components/LiveDealsStrip'
 
-// Supplemental products to complete full catalog matching user mockup
-const EXTRA_PRODUCTS = [
-  {
-    id: 'SKU_107',
-    name: 'Smartwatch Ultra',
-    price: 699900, // ₹6,999
-    category: 'Wearables',
-    discountable: 1,
-    stock_quantity: 42,
-    description: 'Health tracking, AMOLED screen and notifications.',
-  },
-  {
-    id: 'SKU_108',
-    name: 'Urban Backpack',
-    price: 189900, // ₹1,899
-    category: 'Gear',
-    discountable: 1,
-    stock_quantity: 25,
-    description: 'Water-resistant fabric, fits up to 15" laptops.',
-  },
-  {
-    id: 'SKU_109',
-    name: 'Aviator Sunglasses',
-    price: 129900, // ₹1,299
-    category: 'Accessories',
-    discountable: 1,
-    stock_quantity: 0, // Out of stock
-    description: 'UV400 protection with anti-glare polarized lenses.',
-  },
-  {
-    id: 'SKU_110',
-    name: 'Insulated Water Bottle',
-    price: 39900, // ₹399
-    category: 'Gear',
-    discountable: 1,
-    stock_quantity: 85,
-    description: 'Double-wall insulated 100% stainless steel, 1L.',
-  },
-]
+function isLiveCampaign(c) {
+  if (!c || c.status !== 'active') return false
+  const exp = c.expires_at ? new Date(`${c.expires_at}Z`) : null
+  return exp ? exp.getTime() > Date.now() : true
+}
 
-const PRODUCT_DESCRIPTIONS = {
-  SKU_101: 'Premium sound, active noise cancellation.',
-  SKU_102: 'Braided high-speed 60W charging cable.',
-  SKU_103: 'Military-grade drop protection phone case.',
-  SKU_104: 'Compact high-density 10000mAh battery pack.',
-  SKU_105: '360° surround bass portable Bluetooth speaker.',
-  SKU_106: 'Handcrafted genuine leather RFID blocking wallet.',
-  SKU_107: 'Health tracking, AMOLED screen and notifications.',
-  SKU_108: 'Water-resistant fabric, fits up to 15" laptops.',
-  SKU_109: 'UV400 protection with anti-glare polarized lenses.',
-  SKU_110: 'Double-wall insulated 100% stainless steel, 1L.',
+function parseSkuList(json) {
+  try {
+    return JSON.parse(json || '[]')
+  } catch {
+    return []
+  }
+}
+
+function formatReviews(n) {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`
+  return String(n)
+}
+
+function Stars({ rating }) {
+  return (
+    <span className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map(i => (
+        <Star
+          key={i}
+          className={`w-3 h-3 ${i <= Math.round(rating) ? 'text-amber-400 fill-amber-400' : 'text-gray-700'}`}
+        />
+      ))}
+    </span>
+  )
 }
 
 export default function Storefront() {
   const navigate = useNavigate()
   const [products, setProducts] = useState([])
+  const [campaigns, setCampaigns] = useState([])
   const [cart, setCart] = useState([])
   const [checkoutState, setCheckoutState] = useState(null)
   const [error, setError] = useState(null)
   const [category, setCategory] = useState('All Products')
   const [showExplainer, setShowExplainer] = useState(false)
 
-  const loadProducts = () => {
-    fetchProducts().then(d => {
-      let catalog = d.products || []
-      EXTRA_PRODUCTS.forEach(extra => {
-        if (!catalog.some(p => p.id === extra.id)) {
-          catalog.push(extra)
-        }
+  const loadData = () => {
+    Promise.all([fetchProducts(), fetchCampaigns()])
+      .then(([p, c]) => {
+        setProducts(p.products || [])
+        setCampaigns(c.campaigns || [])
       })
-      setProducts(catalog)
-    }).catch(() => {
-      setProducts(EXTRA_PRODUCTS)
-    })
+      .catch(() => {
+        setProducts([])
+        setCampaigns([])
+        setError('Storefront could not reach the demo backend.')
+      })
   }
 
   useEffect(() => {
-    loadProducts()
+    loadData()
 
     try {
       if (sessionStorage.getItem('marlin_demo_autofill') === 'true') {
@@ -101,16 +81,34 @@ export default function Storefront() {
       console.error(e)
     }
 
-    const handleMerchantChange = () => loadProducts()
+    const handleMerchantChange = () => {
+      loadData()
+      setCategory('All Products')
+    }
     window.addEventListener('marlin_merchant_changed', handleMerchantChange)
     return () => window.removeEventListener('marlin_merchant_changed', handleMerchantChange)
   }, [])
 
-  const categories = ['All Products', 'Electronics', 'Accessories', 'Wearables', 'Gear', 'Fashion']
+  // ── Live campaign deals: SKU → active campaign ──
+  const dealsBySku = useMemo(() => {
+    const map = {}
+    ;(campaigns || []).filter(isLiveCampaign).forEach(c => {
+      parseSkuList(c.target_skus_json).forEach(sku => {
+        map[sku] = c
+      })
+    })
+    return map
+  }, [campaigns])
+
+  // Categories derived from the live catalog so merchant-specific
+  // categories (High-End Audio, Apparel, Leather Goods…) work out of the box.
+  const categories = useMemo(() => {
+    const set = new Set((products || []).map(p => p.category).filter(Boolean))
+    return ['All Products', ...set]
+  }, [products])
 
   const visibleProducts = products.filter(p => {
     if (category === 'All Products') return true
-    if (category === 'Electronics') return p.category === 'Electronics' || p.id === 'SKU_101'
     return p.category === category
   })
 
@@ -247,6 +245,12 @@ export default function Storefront() {
               <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
               EVERY AI OFFER IS CHECKED & LOGGED
             </span>
+            {campaigns.some(c => c.status === 'active') && (
+              <span className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-300 bg-amber-950/60 border border-amber-500/30 px-3 py-1 rounded-full">
+                <Flame className="w-3.5 h-3.5 text-amber-400" />
+                {campaigns.filter(c => c.status === 'active').length} LIVE CAMPAIGN{campaigns.filter(c => c.status === 'active').length > 1 ? 'S' : ''} RUNNING
+              </span>
+            )}
           </div>
 
           <button
@@ -296,13 +300,16 @@ export default function Storefront() {
 
       {/* Main Store Layout Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full">
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          
+
           {/* LEFT AREA: Category Chips & Products Grid (8 columns on lg) */}
           <div className="lg:col-span-8 space-y-6">
-            
-            {/* Category Filter Chips */}
+
+            {/* Live AI Deals strip — active campaigns surfaced on the storefront */}
+            <LiveDealsStrip campaigns={campaigns} products={products} />
+
+            {/* Category Filter Chips — derived from live catalog */}
             <div className="flex items-center gap-2 flex-wrap pb-2">
               {categories.map(c => (
                 <button
@@ -325,7 +332,12 @@ export default function Storefront() {
                 const isOutOfStock = product.stock_quantity === 0
                 const isLowStock = product.stock_quantity > 0 && product.stock_quantity <= 15
                 const productCategoryUpper = (product.category || 'General').toUpperCase()
-                const productDesc = PRODUCT_DESCRIPTIONS[product.id] || product.description || 'Premium build quality tech accessory.'
+                const productDesc = product.description || 'Premium build quality tech accessory.'
+                const deal = dealsBySku[product.id]
+                // Discount off price in paise, rounded to a whole rupee
+                const dealPrice = deal
+                  ? Math.round(product.price * (100 - deal.discount_pct) / 100 / 100) * 100
+                  : null
 
                 return (
                   <div
@@ -335,7 +347,7 @@ export default function Storefront() {
                     {/* Top Image Container */}
                     <div className="relative aspect-[4/3] bg-[#090b11] border-b border-white/5 overflow-hidden">
                       <img
-                        src={`/products/${product.id}.jpg`}
+                        src={product.image_url || `/products/${product.id}.jpg`}
                         alt={product.name}
                         loading="lazy"
                         onError={(e) => {
@@ -343,11 +355,19 @@ export default function Storefront() {
                         }}
                         className={`w-full h-full object-cover transition-transform duration-500 ${isOutOfStock ? 'opacity-40 grayscale' : 'group-hover:scale-105'}`}
                       />
-                      
+
                       {/* Top-Left Category Badge */}
                       <span className="absolute top-3 left-3 text-[10px] font-mono font-bold tracking-wider uppercase text-blue-300 bg-blue-950/80 border border-blue-500/30 px-2.5 py-0.5 rounded-full backdrop-blur-md">
                         {productCategoryUpper}
                       </span>
+
+                      {/* AI Deal Badge — live campaign targeting this SKU */}
+                      {deal && (
+                        <span className="absolute bottom-3 left-3 flex items-center gap-1.5 text-[10px] font-mono font-bold tracking-wider uppercase text-amber-300 bg-amber-950/85 border border-amber-500/50 px-2.5 py-1 rounded-full backdrop-blur-md shadow-lg shadow-amber-950/40">
+                          <Flame className="w-3 h-3 text-amber-400" />
+                          AI Deal -{deal.discount_pct}%
+                        </span>
+                      )}
 
                       {/* Top-Right Stock Badge */}
                       <span className="absolute top-3 right-3 text-[10px] font-mono font-medium backdrop-blur-md">
@@ -370,19 +390,43 @@ export default function Storefront() {
                     {/* Product Details Section */}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                       <div>
-                        <h3 className="font-bold text-white text-base group-hover:text-cyan-300 transition-colors line-clamp-1">
-                          {product.name}
-                        </h3>
+                        <div className="flex items-center justify-between gap-2">
+                          <h3 className="font-bold text-white text-base group-hover:text-cyan-300 transition-colors line-clamp-1">
+                            {product.name}
+                          </h3>
+                        </div>
                         <p className="text-xs text-gray-400 mt-1 leading-relaxed line-clamp-2 font-normal">
                           {productDesc}
                         </p>
+                        {typeof product.rating === 'number' && (
+                          <div className="flex items-center gap-1.5 mt-1.5">
+                            <Stars rating={product.rating} />
+                            <span className="text-[11px] font-mono text-gray-400">
+                              {product.rating.toFixed(1)}
+                              <span className="text-gray-600"> ({formatReviews(product.review_count || 0)})</span>
+                            </span>
+                          </div>
+                        )}
                       </div>
 
                       {/* Price & Add to Cart Button */}
                       <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                        <span className="text-base font-extrabold text-white font-mono">
-                          {formatCurrency(product.price)}
-                        </span>
+                        <div className="flex flex-col">
+                          {deal ? (
+                            <>
+                              <span className="text-[11px] text-gray-500 line-through font-mono">
+                                {formatCurrency(product.price)}
+                              </span>
+                              <span className="text-base font-extrabold text-white font-mono text-amber-300">
+                                {formatCurrency(dealPrice)}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="text-base font-extrabold text-white font-mono">
+                              {formatCurrency(product.price)}
+                            </span>
+                          )}
+                        </div>
 
                         {isOutOfStock ? (
                           <button
@@ -405,12 +449,20 @@ export default function Storefront() {
                 )
               })}
             </div>
+
+            {visibleProducts.length === 0 && (
+              <div className="text-center py-16 text-gray-500 border border-dashed border-gray-800 rounded-2xl">
+                <ShoppingBag className="w-10 h-10 mx-auto mb-3 text-gray-700" />
+                <p className="text-sm font-medium text-gray-400">No products in this category</p>
+                <p className="text-xs text-gray-600 mt-1">Try another filter, or switch merchant from the navbar.</p>
+              </div>
+            )}
           </div>
 
           {/* RIGHT AREA: Your Cart Drawer / Sidebar (4 columns on lg) */}
           <div className="lg:col-span-4 sticky top-20">
             <div className="bg-[#0e111b] border border-[#1b1f32] rounded-2xl p-5 shadow-2xl flex flex-col justify-between max-h-[85vh] overflow-y-auto ledger-scroll">
-              
+
               {/* Cart Header */}
               <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-800">
                 <div className="flex items-center gap-2">
@@ -440,7 +492,7 @@ export default function Storefront() {
                     return (
                       <div key={item.sku} className="flex items-center gap-3 bg-[#121625] border border-white/5 rounded-xl p-3">
                         <img
-                          src={`/products/${item.sku}.jpg`}
+                          src={product?.image_url || `/products/${item.sku}.jpg`}
                           alt={product?.name || item.sku}
                           onError={(e) => { e.target.src = '/onboarding/layer1.png' }}
                           className="w-12 h-12 rounded-lg object-cover bg-[#090b11] border border-white/5"
@@ -524,7 +576,7 @@ export default function Storefront() {
                       <p className="text-xs text-amber-300 font-bold mb-1 flex items-center justify-center gap-1.5">
                         <ShieldAlert className="w-4 h-4 text-amber-400 animate-pulse" /> Awaiting Merchant Approval
                       </p>
-                      <p className="text-[10px] text-gray-400 mb-3">Discount exceeds 15% auto-approval threshold.</p>
+                      <p className="text-[10px] text-gray-400 mb-3">Discount exceeds auto-approval threshold.</p>
                       <button
                         onClick={handleApproveAndPay}
                         className="w-full bg-amber-600 hover:bg-amber-500 text-white py-2.5 rounded-lg text-xs font-bold transition"

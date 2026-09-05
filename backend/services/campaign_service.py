@@ -86,6 +86,8 @@ def review_and_propose(merchant_id: str = "merchant_default") -> dict:
     expires_at = now + timedelta(hours=duration_hours)
 
     campaign_id = f"camp_{uuid.uuid4().hex[:8]}"
+    # Scripted demo proposals (no Gemini key configured) are labeled distinctly
+    created_by = "brain-demo" if proposal.get("source") == "scripted_demo" else "brain"
 
     with get_db(merchant_id) as conn:
         conn.execute(
@@ -102,7 +104,7 @@ def review_and_propose(merchant_id: str = "merchant_default") -> dict:
                 expires_at.isoformat(),
                 campaign_status,
                 decision,
-                "brain",
+                created_by,
             ),
         )
 

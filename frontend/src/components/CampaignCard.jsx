@@ -22,9 +22,26 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
           <h3 className="font-semibold text-white">{campaign.name}</h3>
           <p className="text-xs text-gray-500 font-mono mt-1">{campaign.id}</p>
         </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
-          {campaign.status}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {campaign.created_by === 'brain' && (
+            <span className="text-[10px] font-mono text-ai-proposed bg-ai-proposed/10 border border-ai-proposed/30 px-1.5 py-0.5 rounded-md">
+              🤖 Brain
+            </span>
+          )}
+          {campaign.created_by === 'brain-demo' && (
+            <span className="text-[10px] font-mono text-ai-proposed bg-ai-proposed/10 border border-ai-proposed/30 px-1.5 py-0.5 rounded-md">
+              🤖 Brain · demo
+            </span>
+          )}
+          {campaign.created_by === 'merchant' && (
+            <span className="text-[10px] font-mono text-clamped bg-clamped/10 border border-clamped/30 px-1.5 py-0.5 rounded-md">
+              👤 Merchant
+            </span>
+          )}
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${statusColor}`}>
+            {campaign.status}
+          </span>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4 mb-3">
@@ -41,6 +58,12 @@ export default function CampaignCard({ campaign, onApprove, onReject }) {
           <p className="text-sm text-gray-300">{campaign.policy_decision || '—'}</p>
         </div>
       </div>
+
+      {campaign.reasoning && (
+        <div className="text-xs text-gray-400 italic bg-dusk/50 p-2.5 rounded-lg border border-dusk-border mb-3">
+          <span className="text-gray-500 not-italic font-medium">Why:</span> {campaign.reasoning}
+        </div>
+      )}
 
       {hasExpiry && (
         <div className="mb-3">

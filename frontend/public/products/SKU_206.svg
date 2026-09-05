@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0e111b"/>
+      <stop offset="55%" stop-color="#131729"/>
+      <stop offset="100%" stop-color="#1b1f32"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#a78bfa" stop-opacity="0.35"/>
+      <stop offset="70%" stop-color="#a78bfa" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#a78bfa" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <rect width="800" height="600" fill="url(#glow)"/>
+  <circle cx="400" cy="240" r="120" fill="none" stroke="#a78bfa" stroke-opacity="0.5" stroke-width="1.5"/>
+  <circle cx="400" cy="240" r="88" fill="none" stroke="#a78bfa" stroke-opacity="0.3" stroke-width="1"/>
+  <text x="400" y="272" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="110" font-weight="700" fill="#ffffff" text-anchor="middle">S</text>
+  <rect x="300" y="330" width="200" height="34" rx="17" fill="#a78bfa" fill-opacity="0.15" stroke="#a78bfa" stroke-opacity="0.5"/>
+  <text x="400" y="353" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16" font-weight="600" letter-spacing="3" fill="#a78bfa" text-anchor="middle">AUDIO</text>
+  <text x="400" y="420" font-family="ui-sans-serif, system-ui, sans-serif" font-size="26" font-weight="700" fill="#e5e7eb" text-anchor="middle">Studio Microphone</text>
+  <text x="400" y="455" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="15" fill="#64748b" text-anchor="middle">SKU_206</text>
+  <text x="400" y="540" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="13" letter-spacing="6" fill="#475569" text-anchor="middle">RAZORCAGE</text>
+</svg>

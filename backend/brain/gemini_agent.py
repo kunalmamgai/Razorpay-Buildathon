@@ -178,6 +178,75 @@ Rules:
 - Base recommendations on actual patterns in the order history"""
 
 
+# ═══════════════════════════════════════════════════════════════════════
+# SCRIPTED DEMO BRAIN (no GEMINI_API_KEY required)
+# ═══════════════════════════════════════════════════════════════════════
+
+def _scripted_campaign_proposal(order_history: list[dict], catalog: list[dict],
+                                current_campaigns: list[dict] | None = None) -> dict:
+    """Deterministic demo proposals used when GEMINI_API_KEY is not configured.
+
+    Keeps the Brain → Cage → Gate pipeline demonstrable without an LLM key:
+    every review produces a visible proposal whose outcome the Cage decides
+    (approved / clamped / awaiting_approval / rejected) against real merchant
+    policy. Proposals are built from the live catalog and clearly labeled with
+    source='scripted_demo' so the UI and ledger can mark them as demo.
+    """
+    if not catalog:
+        return {"action": "no_campaign", "reasoning": "No catalog available to build a demo proposal from."}
+
+    hero = catalog[0]
+    side = catalog[1] if len(catalog) > 1 else catalog[0]
+    skus = [hero["id"]]
+    if side["id"] != hero["id"]:
+        skus.append(side["id"])
+
+    # Rotate through the scripted set so repeated reviews show different
+    # Cage outcomes. Starts on the threshold-crossing proposal so a demo
+    # tour lands on the human-gate story first.
+    rotation = len(current_campaigns or []) % 3
+
+    scripted = [
+        {
+            "action": "create_campaign",
+            "name": f"Order-Signal Review — 20% off {hero['name']}",
+            "target_skus": [hero["id"]],
+            "discount_pct": 20,
+            "duration_hours": 48,
+            "reasoning": "Demo Brain (no Gemini key configured): repeat-purchase signal detected on this SKU — proposing 20% to exercise the human approval gate.",
+            "objective": "reduce_abandonment",
+            "confidence": 0.6,
+            "success_metric": "Conversion rate on targeted SKU during campaign window.",
+        },
+        {
+            "action": "create_campaign",
+            "name": f"Bundles-in-Basket — 10% off {hero['name']} + {side['name']}",
+            "target_skus": skus,
+            "discount_pct": 10,
+            "duration_hours": 24,
+            "reasoning": "Demo Brain (no Gemini key configured): order history shows the two SKUs frequently bought together — proposing a modest bundle discount.",
+            "objective": "increase_aov",
+            "confidence": 0.7,
+            "success_metric": "Average order value on bundle SKUs.",
+        },
+        {
+            "action": "create_campaign",
+            "name": f"Clearance Blitz — 35% off everything",
+            "target_skus": skus,
+            "discount_pct": 35,
+            "duration_hours": 72,
+            "reasoning": "Demo Brain (no Gemini key configured): aggressive clearance scenario — expect the Cage to enforce hard limits on this one.",
+            "objective": "clear_inventory",
+            "confidence": 0.4,
+            "success_metric": "Units cleared per day.",
+        },
+    ]
+
+    proposal = dict(scripted[rotation])
+    proposal["source"] = "scripted_demo"
+    return proposal
+
+
 def propose_campaign(order_history: list[dict], catalog: list[dict],
                      current_campaigns: list[dict] | None = None) -> dict:
     """Generate a campaign proposal based on order history.
@@ -192,7 +261,9 @@ def propose_campaign(order_history: list[dict], catalog: list[dict],
     gemini_client = _get_client()
     gemini_types = _get_types()
     if gemini_client is None or gemini_types is None:
-        return fallback
+        # No Gemini key (or client unavailable) — use the scripted demo Brain so
+        # the orchestrator pipeline stays demonstrable end-to-end.
+        return _scripted_campaign_proposal(order_history, catalog, current_campaigns)
 
     # Limit order history to recent 30 entries
     recent = order_history[-30:] if len(order_history) > 30 else order_history

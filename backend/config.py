@@ -76,9 +76,13 @@ LOG_FORMAT = os.getenv("LOG_FORMAT", "json" if IS_PRODUCTION else "colored")
 
 # ── Products ──────────────────────────────────────────────────────────────
 # All seed products are discountable (per hackathon spec: SKU_101 & SKU_102
-# explicitly, but we allow all 6 for demo purposes)
+# explicitly, but we allow the full default catalog for demo purposes)
 DISCOUNTABLE_SKUS = {
-    "SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106"
+    "SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106",
+    "SKU_107", "SKU_108", "SKU_109", "SKU_110", "SKU_111", "SKU_112",
+    "SKU_201", "SKU_202", "SKU_203", "SKU_204", "SKU_205", "SKU_206",
+    "SKU_207", "SKU_208", "SKU_209", "SKU_301", "SKU_302", "SKU_303",
+    "SKU_304", "SKU_305", "SKU_306", "SKU_307", "SKU_308", "SKU_309",
 }
 
 

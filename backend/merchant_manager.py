@@ -27,7 +27,10 @@ DEFAULT_MERCHANTS = [
             "auto_approve_threshold_pct": 15,
             "max_campaign_discount_pct": 25,
             "max_campaign_duration_hours": 48,
-            "discountable_skus": ["SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106"],
+            "discountable_skus": [
+                "SKU_101", "SKU_102", "SKU_103", "SKU_104", "SKU_105", "SKU_106",
+                "SKU_107", "SKU_108", "SKU_109", "SKU_110", "SKU_111", "SKU_112",
+            ],
             "risk_appetite": "moderate",
         },
     },
@@ -43,7 +46,10 @@ DEFAULT_MERCHANTS = [
             "auto_approve_threshold_pct": 20,
             "max_campaign_discount_pct": 35,
             "max_campaign_duration_hours": 72,
-            "discountable_skus": ["SKU_101", "SKU_102", "SKU_104"],
+            "discountable_skus": [
+                "SKU_101", "SKU_102", "SKU_104", "SKU_201", "SKU_202", "SKU_203",
+                "SKU_204", "SKU_205", "SKU_206", "SKU_207", "SKU_208", "SKU_209",
+            ],
             "risk_appetite": "high",
         },
     },
@@ -59,7 +65,10 @@ DEFAULT_MERCHANTS = [
             "auto_approve_threshold_pct": 5,
             "max_campaign_discount_pct": 15,
             "max_campaign_duration_hours": 24,
-            "discountable_skus": ["SKU_103", "SKU_105", "SKU_106"],
+            "discountable_skus": [
+                "SKU_103", "SKU_105", "SKU_106", "SKU_301", "SKU_302", "SKU_303",
+                "SKU_304", "SKU_305", "SKU_306", "SKU_307", "SKU_308", "SKU_309",
+            ],
             "risk_appetite": "conservative",
         },
     },
@@ -104,7 +113,9 @@ def init_master_db():
 
 
 def seed_default_merchants():
-    """Seed initial merchant tenants if not present."""
+    """Seed initial merchant tenants if not present, and refresh demo policy
+    configs (e.g. discountable_skus) when the catalog evolves.
+    """
     with get_master_db() as conn:
         for m in DEFAULT_MERCHANTS:
             row = conn.execute(
@@ -130,6 +141,12 @@ def seed_default_merchants():
                     ),
                 )
                 logger.info(f"Seeded merchant tenant: {m['merchant_id']} ({m['name']})")
+            else:
+                # Refresh the demo policy config so expanded catalogs stay discountable
+                conn.execute(
+                    "UPDATE merchants SET policy_config_json = ? WHERE merchant_id = ?",
+                    (json.dumps(m["policy_config"]), m["merchant_id"]),
+                )
 
 
 def get_merchant(merchant_id: str) -> dict:

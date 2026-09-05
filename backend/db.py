@@ -78,7 +78,11 @@ def init_db(merchant_id: str = "merchant_default"):
                 price INTEGER NOT NULL,
                 category TEXT,
                 discountable INTEGER DEFAULT 1,
-                stock_quantity INTEGER DEFAULT 100
+                stock_quantity INTEGER DEFAULT 100,
+                description TEXT DEFAULT NULL,
+                rating REAL DEFAULT 4.5,
+                review_count INTEGER DEFAULT 0,
+                image_url TEXT DEFAULT NULL
             );
 
             CREATE TABLE IF NOT EXISTS orders (
@@ -171,6 +175,24 @@ def init_db(merchant_id: str = "merchant_default"):
             CREATE INDEX IF NOT EXISTS idx_dlq_merchant_status ON dlq_webhooks(merchant_id, status);
             """
         )
+
+        # Backward-compatible migration: add reasoning column to campaigns if missing
+        try:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN reasoning TEXT DEFAULT NULL")
+        except Exception:
+            pass  # Column already exists
+
+        # Backward-compatible migrations for the products table (older DBs)
+        for col, ddl in [
+            ("description", "ALTER TABLE products ADD COLUMN description TEXT DEFAULT NULL"),
+            ("rating", "ALTER TABLE products ADD COLUMN rating REAL DEFAULT 4.5"),
+            ("review_count", "ALTER TABLE products ADD COLUMN review_count INTEGER DEFAULT 0"),
+            ("image_url", "ALTER TABLE products ADD COLUMN image_url TEXT DEFAULT NULL"),
+        ]:
+            try:
+                conn.execute(ddl)
+            except Exception:
+                pass  # Column already exists
 
 
 def init_all_merchants_db():
