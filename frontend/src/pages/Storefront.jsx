@@ -644,7 +644,7 @@ export default function Storefront() {
       <footer className="border-t border-gray-800/80 bg-[#090b11] mt-16 py-6 px-6 text-xs text-gray-500">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <span className="text-[11px] text-gray-400">
-            &copy; 2026 Marlin Infrastructure. AI Policy Protected.
+            &copy; 2026 RazorCage Infrastructure. AI Policy Protected.
           </span>
           <div className="flex items-center gap-6 text-[11px] text-gray-400">
             <a href="#" className="hover:text-white transition">Terms</a>

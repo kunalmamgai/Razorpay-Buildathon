@@ -310,7 +310,7 @@ export default function Onboarding() {
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
-            Marlin Intelligence Framework &middot; Razorpay AI Commerce Hackathon
+            RazorCage Intelligence Framework &middot; Razorpay AI Commerce Hackathon
           </span>
           <div className="flex items-center gap-4">
             <Link to="/" className="hover:text-white transition">Overview</Link>
