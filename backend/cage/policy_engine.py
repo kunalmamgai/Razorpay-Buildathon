@@ -216,30 +216,54 @@ def evaluate_campaign_proposal(
 
 def calculate_final_amount(cart: list[dict], approved_action: dict,
                            catalog: list[dict]) -> dict:
-    """Calculate payable amount server-side."""
+    """Calculate payable amount server-side.
+
+    Supports two stacked discount layers:
+    1. ``campaign_discounts`` — per-SKU rates from live (pre-approved) campaigns.
+       Applied to each targeted line, rounded to a whole rupee so storefront
+       deal prices, cart subtotals, and checkout amounts all agree.
+    2. ``discount_pct`` — the AI upsell rate (already evaluated/clamped by the
+       Cage), applied to the remaining post-campaign total.
+
+    The returned ``discount_pct`` is the effective blended rate for display;
+    the authoritative amounts are the paise values.
+    """
     catalog_map = {p["id"]: p for p in catalog}
+    campaign_map = approved_action.get("campaign_discounts", {}) or {}
+    upsell_pct = approved_action.get("discount_pct", 0)
 
     original_total = 0
+    after_campaign = 0
     for item in cart:
         product = catalog_map.get(item["sku"])
-        if product:
-            original_total += product["price"] * item.get("quantity", 1)
+        if not product:
+            continue
+        line_total = product["price"] * item.get("quantity", 1)
+        original_total += line_total
 
-    discount_pct = approved_action.get("discount_pct", 0)
-    discount_amount = int(original_total * discount_pct / 100)
-    final_amount = original_total - discount_amount
+        campaign_pct = campaign_map.get(item["sku"], 0)
+        line_after = line_total
+        if campaign_pct > 0:
+            line_after = int(round(line_total * (100 - campaign_pct) / 100 / 100)) * 100
+        after_campaign += line_after
 
+    if upsell_pct > 0 and after_campaign > 0:
+        upsell_amount = int(round(after_campaign * upsell_pct / 100 / 100)) * 100
+    else:
+        upsell_amount = 0
+
+    final_amount = after_campaign - upsell_amount
     if final_amount < 0:
         final_amount = 0
-    if discount_pct == 0:
-        discount_amount = 0
-        final_amount = original_total
+
+    discount_amount = original_total - final_amount
+    effective_pct = round(discount_amount / original_total * 100) if original_total else 0
 
     return {
         "original_amount_paise": original_total,
         "final_amount_paise": final_amount,
         "discount_amount_paise": discount_amount,
-        "discount_pct": discount_pct,
+        "discount_pct": effective_pct,
     }
 
 

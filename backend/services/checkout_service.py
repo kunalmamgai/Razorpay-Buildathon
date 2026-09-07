@@ -3,6 +3,7 @@
 import json
 import uuid
 import logging
+from datetime import datetime
 from typing import Optional
 
 from backend.db import get_db, get_connection
@@ -20,6 +21,63 @@ def get_catalog(merchant_id: str = "merchant_default") -> list[dict]:
     with get_db(merchant_id) as conn:
         rows = conn.execute("SELECT * FROM products").fetchall()
         return [dict(row) for row in rows]
+
+
+def _get_active_campaigns(merchant_id: str = "merchant_default") -> list[dict]:
+    """Return status='active' campaigns that have not expired yet."""
+    with get_db(merchant_id) as conn:
+        rows = conn.execute(
+            "SELECT * FROM campaigns WHERE status = 'active'"
+        ).fetchall()
+
+    now = datetime.utcnow()
+    campaigns = []
+    for row in rows:
+        c = dict(row)
+        try:
+            exp = datetime.fromisoformat(c.get("expires_at") or "").replace(tzinfo=None)
+        except (ValueError, TypeError):
+            exp = None
+        if exp is not None and exp < now:
+            continue
+        try:
+            c["target_skus"] = json.loads(c.get("target_skus_json") or "[]")
+        except (json.JSONDecodeError, TypeError):
+            c["target_skus"] = []
+        campaigns.append(c)
+    return campaigns
+
+
+def _campaign_map_for_cart(cart_skus: list[str], active_campaigns: list[dict]) -> tuple[dict, list[dict]]:
+    """Best campaign discount per cart SKU, plus summaries of the campaigns applied.
+
+    Returns (sku -> pct map, list of applied campaign summaries).
+    """
+    best = {}
+    for c in active_campaigns:
+        pct = int(c.get("discount_pct") or 0)
+        if pct <= 0:
+            continue
+        for sku in c.get("target_skus", []):
+            if sku in cart_skus and pct > best.get(sku, {}).get("discount_pct", 0):
+                best[sku] = {
+                    "discount_pct": pct,
+                    "campaign_name": c.get("name") or "Live campaign",
+                    "campaign_id": c.get("id"),
+                }
+    campaign_map = {sku: info["discount_pct"] for sku, info in best.items()}
+    applied = [{"sku": sku, **info} for sku, info in best.items()]
+    return campaign_map, applied
+
+
+def _join_campaign_reasoning(applied_campaigns: list[dict], brain_reasoning: str) -> str:
+    """Human-readable reasoning line mentioning every applied campaign."""
+    parts = [
+        f"{a['discount_pct']}% live campaign '{a['campaign_name']}' applied to {a['sku']}"
+        for a in applied_campaigns
+    ]
+    campaign_line = "Active campaign discount: " + "; ".join(parts) + "."
+    return f"{campaign_line} {brain_reasoning}".strip()
 
 
 def _amounts_from_snapshot(entry: dict, final_action: dict, merchant_id: str = "merchant_default") -> dict:
@@ -63,18 +121,44 @@ def _amounts_from_snapshot(entry: dict, final_action: dict, merchant_id: str = "
     if original_total == 0:
         original_total = 100000
 
-    discount_pct = final_action.get("discount_pct", 0)
-    discount_amount = int(original_total * discount_pct / 100)
-    final_amount = original_total - discount_amount
+    # Mirror calculate_final_amount: campaign layer per-SKU, then upsell layer.
+    campaign_map = final_action.get("campaign_discounts", {}) or {}
+    after_campaign = original_total
+    if campaign_map:
+        after_campaign = 0
+        cart_items = []
+        if cart_raw:
+            try:
+                cart_items = json.loads(cart_raw) if isinstance(cart_raw, str) else cart_raw
+            except (json.JSONDecodeError, TypeError):
+                cart_items = []
+        for item in cart_items:
+            sku = item.get("sku") if isinstance(item, dict) else item
+            product = catalog_map.get(sku)
+            if not product:
+                continue
+            qty = item.get("quantity", 1) if isinstance(item, dict) else 1
+            line_total = product["price"] * qty
+            campaign_pct = campaign_map.get(sku, 0)
+            if campaign_pct > 0:
+                line_total = int(round(line_total * (100 - campaign_pct) / 100 / 100)) * 100
+            after_campaign += line_total
+
+    upsell_pct = final_action.get("discount_pct", 0)
+    if after_campaign > 0 and upsell_pct > 0:
+        discount_amount = int(round(after_campaign * upsell_pct / 100 / 100)) * 100
+    else:
+        discount_amount = 0
+    final_amount = after_campaign - discount_amount
     if final_amount <= 0:
         final_amount = original_total
         discount_amount = 0
-        discount_pct = 0
+        upsell_pct = 0
     return {
         "original_total": original_total,
         "final_amount": final_amount,
         "discount_amount": discount_amount,
-        "discount_pct": discount_pct,
+        "discount_pct": upsell_pct,
     }
 
 
@@ -123,17 +207,52 @@ def propose_checkout(
         })
         original_total += line_total
 
-    # Brain proposes
-    proposal = propose_upsell(cart_detail, catalog)
+    # ── Live campaign baseline: active campaigns targeting cart SKUs ──
+    # These were already approved by the merchant when the campaign was
+    # activated, so they are a guaranteed, pre-approved discount layer.
+    active_campaigns = _get_active_campaigns(merchant_id)
+    cart_skus = [item["sku"] for item in cart_detail]
+    campaign_map, applied_campaigns = _campaign_map_for_cart(cart_skus, active_campaigns)
+
+    # Brain proposes (given campaign context so it stacks, not duplicates)
+    proposal = propose_upsell(cart_detail, catalog, active_campaigns=active_campaigns)
+
+    # Fold the campaign baseline into the proposal. The Cage still evaluates
+    # the AI upsell portion; the campaign portion was gated at activation.
+    if applied_campaigns:
+        upsell_pct = proposal.get("discount_pct", 0) if proposal.get("action") == "upsell" else 0
+        upsell_skus = list(proposal.get("skus", [])) if proposal.get("action") == "upsell" else []
+        proposal = {
+            "action": "upsell",
+            "skus": sorted(set(cart_skus) | set(upsell_skus)),
+            "discount_pct": upsell_pct,
+            "reasoning": _join_campaign_reasoning(applied_campaigns, proposal.get("reasoning", "")),
+            "confidence": proposal.get("confidence", 0.0),
+            "expected_benefit": proposal.get("expected_benefit", ""),
+            "campaign_discounts": campaign_map,
+        }
 
     # Cage evaluates using merchant's policy rules
     policy_result = evaluate_upsell_proposal(proposal, catalog, policy_config=policy_config)
 
-    # Calculate amounts server-side
-    final_action = policy_result.get("final_action", {})
+    # Calculate amounts server-side (campaign layer + upsell layer)
+    final_action = dict(policy_result.get("final_action", {}))
+    final_action["campaign_discounts"] = campaign_map
     amounts = calculate_final_amount(cart, final_action, catalog)
 
     decision = policy_result["decision"]
+
+    # Display copy: expose the effective blended rate (campaign + upsell) so
+    # the UI shows the real savings. The Cage evaluated the upsell portion.
+    if applied_campaigns:
+        proposal = dict(proposal)
+        proposal["discount_pct"] = amounts["discount_pct"]
+
+    # Persist the campaign layer with the final action so order flows can
+    # recompute amounts even when the snapshot is missing. The response keeps
+    # the Cage's pure output; only the ledger copy carries the extra key.
+    ledger_policy_result = dict(policy_result)
+    ledger_policy_result["final_action"] = final_action
 
     # Log entry to merchant's isolated ledger
     entry_id = log_entry(
@@ -143,7 +262,7 @@ def propose_checkout(
         trigger="checkout",
         proposal=proposal,
         reasoning=proposal.get("reasoning", ""),
-        policy_result=policy_result,
+        policy_result=ledger_policy_result,
         idempotency_key=idempotency_key,
         outcome=decision,
         amounts=amounts,
@@ -164,6 +283,8 @@ def propose_checkout(
         "razorpay_key_id": key_id,
         "idempotency_key": idempotency_key,
         "merchant_id": merchant_id,
+        "campaigns_applied": applied_campaigns,
+        "campaign_discount_pct": amounts["discount_pct"] if applied_campaigns else 0,
     }
 
 
@@ -179,7 +300,10 @@ def approve_checkout(ledger_id: int, merchant_id: str = "merchant_default") -> d
     if entry.get("approval_status") == "approved":
         raise ValueError(f"Entry {ledger_id} has already been approved")
 
-    with get_connection(merchant_id) as conn:
+    # NOTE: ConnectionWrapper is not a context manager — manage the
+    # transaction explicitly and always close the connection.
+    conn = get_connection(merchant_id)
+    try:
         conn.execute("BEGIN IMMEDIATE")
         row = conn.execute(
             "SELECT id FROM ledger WHERE id = ? AND (approval_status IS NULL OR approval_status != 'approved')",
@@ -188,13 +312,15 @@ def approve_checkout(ledger_id: int, merchant_id: str = "merchant_default") -> d
         if not row:
             conn.execute("ROLLBACK")
             raise ValueError(f"Entry {ledger_id} has already been approved")
-        
+
         from datetime import datetime
         conn.execute(
             "UPDATE ledger SET approval_status = ?, approval_actor = ?, approval_timestamp = ? WHERE id = ?",
             ("approved", "merchant", datetime.utcnow().isoformat(), ledger_id),
         )
         conn.execute("COMMIT")
+    finally:
+        conn.close()
 
     final_action = json.loads(entry["final_action_json"]) if entry["final_action_json"] else {}
     proposal = json.loads(entry["proposal_json"]) if entry["proposal_json"] else {}

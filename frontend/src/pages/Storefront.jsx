@@ -222,11 +222,25 @@ export default function Storefront() {
     rzp.open()
   }
 
-  const cartTotalPaise = cart.reduce((sum, item) => {
+  // Cart totals honor live campaign deal prices using the same per-SKU,
+  // whole-rupee math the backend applies at checkout — so card price ===
+  // cart subtotal === payable amount.
+  const cartOriginalTotalPaise = cart.reduce((sum, item) => {
     const product = products.find(p => p.id === item.sku)
     return sum + (product ? product.price * item.quantity : 0)
   }, 0)
 
+  const cartTotalPaise = cart.reduce((sum, item) => {
+    const product = products.find(p => p.id === item.sku)
+    if (!product) return sum
+    const deal = dealsBySku[item.sku]
+    const unit = deal
+      ? Math.round(product.price * (100 - deal.discount_pct) / 100 / 100) * 100
+      : product.price
+    return sum + unit * item.quantity
+  }, 0)
+
+  const cartDealSavingsPaise = cartOriginalTotalPaise - cartTotalPaise
   const cartTotalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
@@ -489,6 +503,10 @@ export default function Storefront() {
                 <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-1 ledger-scroll">
                   {cart.map(item => {
                     const product = products.find(p => p.id === item.sku)
+                    const deal = dealsBySku[item.sku]
+                    const cartUnitPrice = deal
+                      ? Math.round(product?.price * (100 - deal.discount_pct) / 100 / 100) * 100
+                      : product?.price
                     return (
                       <div key={item.sku} className="flex items-center gap-3 bg-[#121625] border border-white/5 rounded-xl p-3">
                         <img
@@ -517,8 +535,13 @@ export default function Storefront() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">
-                          <span className="text-xs font-mono font-bold text-white">
-                            {formatCurrency((product?.price || 0) * item.quantity)}
+                          {deal && (
+                            <span className="text-[10px] text-gray-500 line-through font-mono">
+                              {formatCurrency((product?.price || 0) * item.quantity)}
+                            </span>
+                          )}
+                          <span className={`text-xs font-mono font-bold ${deal ? 'text-amber-300' : 'text-white'}`}>
+                            {formatCurrency((cartUnitPrice || 0) * item.quantity)}
                           </span>
                           <button
                             onClick={() => removeFromCart(item.sku)}
@@ -555,6 +578,15 @@ export default function Storefront() {
               {/* Cart Footer Subtotal & Action CTA */}
               {cart.length > 0 && (
                 <div className="border-t border-gray-800 pt-4 space-y-4">
+                  {cartDealSavingsPaise > 0 && (
+                    <div className="flex justify-between items-center text-xs text-emerald-400">
+                      <span className="flex items-center gap-1.5">
+                        <Flame className="w-3.5 h-3.5 text-amber-400" />
+                        Live AI deals applied
+                      </span>
+                      <span className="font-mono font-bold">-{formatCurrency(cartDealSavingsPaise)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-400 font-medium">Subtotal</span>
                     <span className="font-mono text-xl font-extrabold text-white">

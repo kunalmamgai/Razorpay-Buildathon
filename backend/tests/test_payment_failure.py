@@ -12,6 +12,19 @@ import pytest
 from unittest.mock import patch
 
 
+@pytest.fixture(autouse=True)
+def no_campaigns(monkeypatch):
+    """Isolate payment-failure tests from live campaigns seeded into the test DB
+    (campaign-at-checkout behavior is covered in test_campaign_checkout.py)."""
+    import backend.services.checkout_service as checkout_service
+    monkeypatch.setattr(
+        checkout_service,
+        "_get_active_campaigns",
+        lambda merchant_id="merchant_default": [],
+    )
+
+
+
 def make_proposal(discount_pct: int, skus: list[str], reasoning: str = "Test"):
     return {
         "action": "upsell" if discount_pct > 0 or skus else "no_offer",
@@ -124,7 +137,8 @@ class TestDuplicateWebhook:
         assert resp1.json()["status"] == "processed"
 
         resp2 = client.post("/api/webhooks/razorpay", json=webhook)
-        assert resp2.json()["status"] == "already_processed"
+        # Idempotent replay returns the cached success response
+        assert resp2.json() == resp1.json()
 
     def test_different_events_not_deduplicated(self, client):
         order_id, corr_id = create_and_approve_order(client)

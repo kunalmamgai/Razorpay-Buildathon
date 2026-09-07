@@ -1,13 +1,16 @@
 """Shared test fixtures for the Marlin Growth Agent test suite.
 
 Provides:
-- An isolated temporary SQLite database (per test session)
-- Seeded product catalog
+- An isolated temporary SQLite data directory (per test session) so tests
+  never touch the real merchant databases under backend/data/
+- The production seeding path (init DB + products + demo campaigns) runs via
+  the FastAPI TestClient lifespan
 - A FastAPI TestClient wired to the test DB
 """
 import os
 import sys
 import tempfile
+from pathlib import Path
 import pytest
 
 # Ensure backend package is importable
@@ -15,51 +18,34 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
 import backend.db as db_module
 import backend.config as config_module
+import backend.merchant_manager as merchant_manager
 
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_test_db():
-    """Create a temporary SQLite database for the entire test session."""
-    fd, db_path = tempfile.mkstemp(suffix=".db")
-    os.close(fd)
+    """Point SQLite data paths at a temp directory for the whole session.
 
-    # Override the DB URL before any schema creation
-    original_url = config_module.DATABASE_URL
-    config_module.DATABASE_URL = db_path
+    db.py / merchant_manager.py resolve their data dirs at import time, so we
+    patch the module-level path constants directly. The FastAPI lifespan then
+    initializes the schema and seeds products + demo campaigns into the temp
+    dir on the first TestClient.
+    """
+    tmp_dir = Path(tempfile.mkdtemp(prefix="razorcage_test_"))
 
-    # Initialize schema + seed products
-    db_module.init_db()
-    _seed_products(db_path)
+    config_module.DATA_DIR = tmp_dir
+    config_module.DATABASE_URL = str(tmp_dir / "marlin_test.db")
 
-    yield db_path
+    db_module.MERCHANTS_DIR = tmp_dir / "merchants"
+    db_module.MERCHANTS_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Cleanup
-    config_module.DATABASE_URL = original_url
-    try:
-        os.unlink(db_path)
-    except OSError:
-        pass
+    merchant_manager.MASTER_DB_PATH = tmp_dir / "master_merchants.db"
+    merchant_manager.MERCHANTS_DIR = tmp_dir / "merchants"
+    merchant_manager.MERCHANTS_DIR.mkdir(parents=True, exist_ok=True)
 
+    yield tmp_dir
 
-def _seed_products(db_path: str):
-    """Insert the 6 seed products into the test database."""
-    products = [
-        ("SKU_101", "Wireless Earbuds Pro", 299900, "Electronics", 1, 150),
-        ("SKU_102", "USB-C Charging Cable (2m)", 49900, "Accessories", 1, 500),
-        ("SKU_103", "Phone Case — MagSafe Compatible", 99900, "Accessories", 1, 200),
-        ("SKU_104", "Portable Power Bank 10000mAh", 149900, "Electronics", 1, 30),
-        ("SKU_105", "Bluetooth Speaker Mini", 199900, "Electronics", 1, 80),
-        ("SKU_106", "Premium Leather Wallet", 129900, "Fashion", 1, 120),
-    ]
-    import sqlite3
-    conn = sqlite3.connect(db_path)
-    for p in products:
-        conn.execute(
-            "INSERT OR IGNORE INTO products (id, name, price, category, discountable, stock_quantity) VALUES (?, ?, ?, ?, ?, ?)",
-            p,
-        )
-    conn.commit()
-    conn.close()
+    import shutil
+    shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 @pytest.fixture

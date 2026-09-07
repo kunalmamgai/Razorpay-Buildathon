@@ -164,3 +164,24 @@ def health_check():
         "checks": checks,
         "version": "1.1.0",
     }
+
+
+@app.get("/ready")
+def ready_check():
+    """Readiness probe for deployment orchestrators / load balancers."""
+    from backend.ledger.ledger import get_stats
+    from backend.services.scheduler import get_schedule_info
+
+    checks = {"database": "healthy", "scheduler": "unknown"}
+    try:
+        get_stats("merchant_default")
+    except Exception as e:
+        checks["database"] = f"unhealthy: {e}"
+
+    try:
+        sched = get_schedule_info()
+        checks["scheduler"] = "running" if sched.get("scheduler_running") else "stopped"
+    except Exception:
+        checks["scheduler"] = "unknown"
+
+    return {"ready": checks["database"] == "healthy", "checks": checks}

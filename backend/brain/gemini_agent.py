@@ -92,8 +92,12 @@ Rules:
 - Be specific about which SKUs to bundle and why"""
 
 
-def propose_upsell(cart: list[dict], catalog: list[dict], customer_signals: dict | None = None) -> dict:
+def propose_upsell(cart: list[dict], catalog: list[dict], customer_signals: dict | None = None,
+                    active_campaigns: list[dict] | None = None) -> dict:
     """Generate an upsell proposal for a given cart.
+
+    ``active_campaigns`` (optional) lists live campaigns so the Brain can stack
+    an upsell on top of an existing deal instead of duplicating it.
 
     Returns a dict matching the UpsellProposal schema.
     Falls back to no_offer if Gemini is unavailable or returns malformed output.
@@ -113,6 +117,11 @@ def propose_upsell(cart: list[dict], catalog: list[dict], customer_signals: dict
     ]
     if customer_signals:
         user_parts.append(f"Customer signals: {json.dumps(customer_signals, default=str)}")
+    if active_campaigns:
+        user_parts.append(
+            "Active campaigns already live (do NOT duplicate these discounts; propose on top of them): "
+            f"{json.dumps(active_campaigns, default=str)}"
+        )
     user_parts.append("Remember: you are advisory only. The policy engine will validate your output.")
     user_msg = "\n".join(user_parts)
 

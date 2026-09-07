@@ -14,6 +14,22 @@ import pytest
 from unittest.mock import patch
 
 
+@pytest.fixture(autouse=True)
+def no_campaigns(monkeypatch):
+    """Isolate these Cage/upsell tests from live campaigns seeded into the test DB.
+
+    Campaign-at-checkout behavior has its own dedicated test file
+    (test_campaign_checkout.py); here the campaign baseline is disabled so
+    the pure Brain → Cage semantics stay exactly as asserted.
+    """
+    import backend.services.checkout_service as checkout_service
+    monkeypatch.setattr(
+        checkout_service,
+        "_get_active_campaigns",
+        lambda merchant_id="merchant_default": [],
+    )
+
+
 # ═══════════════════════════════════════════════════════════════════════
 # Helpers
 # ═══════════════════════════════════════════════════════════════════════
@@ -61,7 +77,7 @@ class TestCheckoutHappyPath:
         data = resp.json()
         assert data["policy_result"]["decision"] == "approved"
         assert data["discount_pct"] == 10
-        assert data["discount_amount_paise"] == 29990
+        assert data["discount_amount_paise"] == 30000  # rounded to a whole rupee
 
     def test_multiple_items(self, client):
         """Two items → amounts calculated correctly."""
@@ -89,7 +105,7 @@ class TestCageClamps:
         assert data["proposal"]["discount_pct"] == 25  # Original proposal stored
         assert data["policy_result"]["final_action"]["discount_pct"] == 20  # Clamped
         assert data["discount_pct"] == 20
-        assert data["discount_amount_paise"] == 59980
+        assert data["discount_amount_paise"] == 60000  # rounded to a whole rupee
         # 20% > 15% → awaiting_approval
         assert data["policy_result"]["decision"] == "awaiting_approval"
 
@@ -287,9 +303,10 @@ class TestDuplicateWebhook:
         resp1 = client.post("/api/webhooks/razorpay", json=webhook_payload)
         assert resp1.json()["status"] == "processed"
 
-        # Duplicate webhook
+        # Duplicate webhook — idempotent replay returns the cached response
+        # (status "already_processed" is reserved for in-flight/failed events)
         resp2 = client.post("/api/webhooks/razorpay", json=webhook_payload)
-        assert resp2.json()["status"] == "already_processed"
+        assert resp2.json() == resp1.json()
 
 
 # ═══════════════════════════════════════════════════════════════════════

@@ -360,8 +360,9 @@ class TestCalculateFinalAmount:
             catalog=CATALOG,
         )
         assert amounts["original_amount_paise"] == 299900
-        assert amounts["discount_amount_paise"] == 29990
-        assert amounts["final_amount_paise"] == 299900 - 29990
+        # Amounts are rounded to a whole rupee (299.9 -> 300)
+        assert amounts["discount_amount_paise"] == 30000
+        assert amounts["final_amount_paise"] == 269900
         assert amounts["discount_pct"] == 10
 
     def test_amount_with_0_pct_discount(self):
@@ -384,10 +385,10 @@ class TestCalculateFinalAmount:
             catalog=CATALOG,
         )
         original = 299900 + (49900 * 3)  # 299900 + 149700 = 449600
-        discount = int(original * 15 / 100)
+        # 15% = 674.4 -> rounded to a whole rupee 67400
         assert amounts["original_amount_paise"] == original
-        assert amounts["discount_amount_paise"] == discount
-        assert amounts["final_amount_paise"] == original - discount
+        assert amounts["discount_amount_paise"] == 67400
+        assert amounts["final_amount_paise"] == 382200
 
     def test_amount_never_negative(self):
         amounts = calculate_final_amount(

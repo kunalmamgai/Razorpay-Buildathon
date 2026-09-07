@@ -7,7 +7,10 @@ export default function AISuggestion({ proposal, policyResult, originalAmount, f
   const isClamped = policyResult?.violations?.length > 0
   const needsApproval = policyResult?.needs_human_approval
 
-  const discountPct = policyResult?.final_action?.discount_pct ?? proposal.discount_pct
+  // Effective blended rate from the authoritative amounts (campaign layer +
+  // upsell layer). Falls back to the Cage/proposal rate when there is none.
+  const effectivePct = originalAmount > 0 ? Math.round((discountAmount / originalAmount) * 100) : 0
+  const discountPct = effectivePct > 0 ? effectivePct : (policyResult?.final_action?.discount_pct ?? proposal.discount_pct)
 
   return (
     <div className={`rounded-xl p-4 mb-4 border backdrop-blur-md transition-all duration-300 ${
