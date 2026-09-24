@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { fetchLedger, fetchLedgerStats, fetchCampaigns, reviewCampaign, approveCampaign, rejectCampaign, simulatePaymentFailure } from '../api'
 import StatStrip from '../components/StatStrip'
+import OperationsVisual from '../components/OperationsVisual'
 import FilterBar from '../components/FilterBar'
 import FourStateCard from '../components/FourStateCard'
 import FailureRecoveryView from '../components/FailureRecoveryView'
@@ -244,6 +245,7 @@ export default function Dashboard() {
 
         {/* Top Volume Stats & Pipeline Reference Cards */}
         <StatStrip stats={stats} />
+        {activeTab === 'overview' && <div className="mb-6 grid gap-5 md:grid-cols-2"><OperationsVisual variant="schedule" /><OperationsVisual variant="ledger" /></div>}
         {loadError && (
           <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
             {loadError}

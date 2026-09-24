@@ -10,6 +10,7 @@ import { formatCurrency } from '../lib/colors'
 import AISuggestion from '../components/AISuggestion'
 import Navbar from '../components/Navbar'
 import LiveDealsStrip from '../components/LiveDealsStrip'
+import OperationsVisual from '../components/OperationsVisual'
 
 function isLiveCampaign(c) {
   if (!c || c.status !== 'active') return false
@@ -319,6 +320,7 @@ export default function Storefront() {
 
           {/* LEFT AREA: Category Chips & Products Grid (8 columns on lg) */}
           <div className="lg:col-span-8 space-y-6">
+            <OperationsVisual variant="products" />
 
             {/* Live AI Deals strip — active campaigns surfaced on the storefront */}
             <LiveDealsStrip campaigns={campaigns} products={products} />

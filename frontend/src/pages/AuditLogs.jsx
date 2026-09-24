@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import { fetchLedger } from '../api'
+import OperationsVisual from '../components/OperationsVisual'
 
 export default function AuditLogs() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -213,6 +214,7 @@ export default function AuditLogs() {
         </div>
 
         {/* Main Two-Column Forensic Layout */}
+        <div className="mb-6 grid gap-5 md:grid-cols-2"><OperationsVisual variant="ledger" /><OperationsVisual variant="approvals" /></div>
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column: System Forensic View */}

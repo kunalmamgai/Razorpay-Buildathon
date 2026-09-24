@@ -3,6 +3,7 @@ import { ShieldCheck, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import Navbar from '../components/Navbar'
 import ApprovalPanel from '../components/ApprovalPanel'
 import { fetchApprovals } from '../api'
+import OperationsVisual from '../components/OperationsVisual'
 
 export default function Approvals() {
   const [pendingCount, setPendingCount] = useState(0)
@@ -41,6 +42,7 @@ export default function Approvals() {
         </div>
 
         {/* Approvals Panel Feed */}
+        <div className="mb-6 grid gap-5 md:grid-cols-2"><OperationsVisual variant="approvals" /><OperationsVisual variant="ledger" /></div>
         <ApprovalPanel />
 
       </main>

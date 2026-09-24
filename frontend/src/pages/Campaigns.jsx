@@ -8,6 +8,7 @@ import CampaignCard from '../components/CampaignCard'
 import AgentActivityStrip from '../components/AgentActivityStrip'
 import DemoTour from '../components/DemoTour'
 import CreateCampaignModal from '../components/CreateCampaignModal'
+import OperationsVisual from '../components/OperationsVisual'
 import { fetchCampaigns, reviewCampaign, approveCampaign, rejectCampaign } from '../api'
 
 // Brain → Cage → Gate → Ledger — the pipeline every campaign proposal passes through
@@ -186,6 +187,8 @@ export default function Campaigns() {
             )
           })}
         </div>
+
+        <div className="mb-6 grid gap-5 md:grid-cols-2"><OperationsVisual variant="schedule" /><OperationsVisual variant="approvals" /></div>
 
         {/* Search + status filters */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
