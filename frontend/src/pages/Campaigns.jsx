@@ -120,7 +120,7 @@ export default function Campaigns() {
   }, [campaigns, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
-    <div className="dusk-sky-bg min-h-screen text-white flex flex-col font-sans selection:bg-candy-lavender selection:text-white">
+    <div className="campaigns-theme min-h-screen bg-[#f7f7f2] text-[#111827] flex flex-col font-sans selection:bg-[#d7ff4f] selection:text-[#111827]">
       <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">

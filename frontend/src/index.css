@@ -277,3 +277,99 @@ body {
   background: #f7f7f2 !important;
   border-color: #dfe1d7 !important;
 }
+
+/* === Campaigns uses the onboarding operations theme === */
+.campaigns-theme {
+  background: #f7f7f2 !important;
+  color: #111827;
+}
+
+.campaigns-theme nav {
+  background: rgba(247, 247, 242, 0.95) !important;
+  border-color: #dfe1d7 !important;
+  color: #111827 !important;
+}
+
+.campaigns-theme [class*="bg-dusk"],
+.campaigns-theme [class*="bg-[#171325]"],
+.campaigns-theme [class*="bg-[#211B36]"],
+.campaigns-theme [class*="bg-[#0e111b]"],
+.campaigns-theme [class*="bg-[#121625]"],
+.campaigns-theme [class*="bg-gray-900"] {
+  background: #ffffff !important;
+}
+
+.campaigns-theme [class*="border-dusk"],
+.campaigns-theme [class*="border-[#1b1f32"],
+.campaigns-theme [class*="border-white/5"],
+.campaigns-theme [class*="border-white/10"] {
+  border-color: #dfe1d7 !important;
+}
+
+.campaigns-theme [class*="text-white"] {
+  color: #111827 !important;
+}
+
+.campaigns-theme [class*="text-gray-200"],
+.campaigns-theme [class*="text-gray-300"],
+.campaigns-theme [class*="text-gray-400"],
+.campaigns-theme [class*="text-gray-500"],
+.campaigns-theme [class*="text-gray-600"] {
+  color: #687066 !important;
+}
+
+.campaigns-theme [class*="hover:text-white"]:hover {
+  color: #111827 !important;
+}
+
+.campaigns-theme [class*="bg-candy-lavender"],
+.campaigns-theme [class*="bg-purple-950"] {
+  background: #eff7d0 !important;
+}
+
+.campaigns-theme [class*="text-candy-lavender"],
+.campaigns-theme [class*="text-candy-lavender-deep"],
+.campaigns-theme [class*="text-purple-300"] {
+  color: #587000 !important;
+}
+
+.campaigns-theme [class*="bg-blue-950"],
+.campaigns-theme [class*="bg-ai-proposed"] {
+  background: #e5f4ff !important;
+}
+
+.campaigns-theme [class*="text-ai-proposed"],
+.campaigns-theme [class*="text-blue-300"],
+.campaigns-theme [class*="text-blue-400"] {
+  color: #28729c !important;
+}
+
+.campaigns-theme [class*="bg-amber-950"] {
+  background: #fff1d8 !important;
+}
+
+.campaigns-theme [class*="bg-emerald-950"] {
+  background: #eff7d0 !important;
+}
+
+.campaigns-theme [class*="bg-gradient-to-r"] {
+  background-image: linear-gradient(135deg, #111827 0%, #394653 100%) !important;
+}
+
+.campaigns-theme button[class*="bg-gradient-to-r"],
+.campaigns-theme button[class*="bg-candy-lavender-deep"] {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.campaigns-theme input,
+.campaigns-theme select {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: #cfd3c6 !important;
+}
+
+.campaigns-theme footer {
+  background: #f7f7f2 !important;
+  border-color: #dfe1d7 !important;
+}
