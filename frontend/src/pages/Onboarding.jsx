@@ -1,181 +1,67 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import {
-  ArrowRight, BarChart3, Check, ChevronRight, CircleDollarSign, Clock3,
-  FileCheck2, Menu, Play, ShieldCheck, Sparkles, Store, X,
-} from 'lucide-react'
+import { ArrowRight, BarChart3, Check, ChevronRight, Clock3, FileCheck2, Menu, Play, ShieldCheck, Sparkles, X } from 'lucide-react'
+
+const runtimeSteps = [
+  ['Signal', 'Cart or order event', 'webhook · schedule', 'bg-[#e5f4ff]'],
+  ['Brain', 'Proposal generated', 'context + reasoning', 'bg-[#eff7d0]'],
+  ['Cage', 'Policy evaluated', 'caps + SKUs + risk', 'bg-[#fff1d8]'],
+]
 
 const schedules = [
-  { label: 'Cart intelligence', trigger: 'CRON · 08:30', state: 'LIVE', icon: BarChart3, color: 'text-sky-600', bg: 'bg-sky-50' },
-  { label: 'Approval queue', trigger: 'WEBHOOK', state: 'LIVE', icon: FileCheck2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { label: 'Memory maintenance', trigger: 'ADAPTIVE', state: 'READY', icon: Clock3, color: 'text-amber-600', bg: 'bg-amber-50' },
+  ['Cart intelligence', 'Cron · 08:30', 'Analyze', 'Propose'],
+  ['Approval queue', 'Webhook', 'Review', 'Gate'],
+  ['Campaign review', 'Hourly', 'Score', 'Activate'],
+  ['Payment recovery', 'Event-driven', 'Detect', 'Revert'],
 ]
 
 const inbox = [
-  { title: 'Bundle proposal ready', detail: 'The Brain found a high-intent cart opportunity', time: '8m', color: 'bg-sky-500' },
-  { title: 'Approval required', detail: 'A 16% offer is waiting at the Human Gate', time: '1h', color: 'bg-amber-500' },
-  { title: 'Payment recovery complete', detail: 'A failed payment was safely reverted', time: '4h', color: 'bg-emerald-500' },
+  ['AI', 'Bundle proposal ready', 'The Brain found a high-intent cart opportunity', '8m', 'bg-sky-500'],
+  ['HG', 'Approval required', 'A 16% offer is waiting at the Human Gate', '1h', 'bg-amber-500'],
+  ['LG', 'Ledger entry committed', 'Payment recovery was recorded successfully', '4h', 'bg-emerald-500'],
 ]
 
 export default function Onboarding() {
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [guardrail, setGuardrail] = useState('Require approval')
 
   const launchDemo = () => {
-    try {
-      sessionStorage.setItem('marlin_demo_autofill', 'true')
-    } catch (error) {
-      console.error(error)
-    }
+    try { sessionStorage.setItem('marlin_demo_autofill', 'true') } catch (error) { console.error(error) }
     navigate('/store')
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#f7f7f2] text-[#111827] selection:bg-[#d7ff4f] selection:text-[#111827]">
-      <header className="border-b border-[#dfe1d7] bg-[#f7f7f2]/95 backdrop-blur-xl">
+    <div className="min-h-screen overflow-hidden bg-[#f7f7f2] text-[#111827] selection:bg-[#d7ff4f]">
+      <header className="sticky top-0 z-50 border-b border-[#dfe1d7] bg-[#f7f7f2]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-          <Link to="/" className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111827] text-[#d7ff4f]">
-              <Sparkles className="h-4 w-4" />
-            </span>
-            <span className="text-sm font-black tracking-[-0.03em]">RAZORCAGE<span className="text-[#6f7e00]">.AI</span></span>
-          </Link>
-
-          <nav className="hidden items-center gap-7 text-xs font-bold text-[#5f665c] md:flex">
-            <a href="#system" className="transition hover:text-[#111827]">System</a>
-            <a href="#guardrails" className="transition hover:text-[#111827]">Guardrails</a>
-            <a href="#inbox" className="transition hover:text-[#111827]">Agent inbox</a>
-            <Link to="/dashboard" className="transition hover:text-[#111827]">Mission control</Link>
-          </nav>
-
-          <div className="hidden items-center gap-3 md:flex">
-            <Link to="/store" className="text-xs font-bold text-[#5f665c] transition hover:text-[#111827]">Open storefront</Link>
-            <button onClick={launchDemo} className="flex items-center gap-2 rounded-full bg-[#111827] px-4 py-2.5 text-xs font-bold text-white transition hover:bg-[#283344]">
-              Launch demo <ArrowRight className="h-3.5 w-3.5 text-[#d7ff4f]" />
-            </button>
-          </div>
-
-          <button className="rounded-full border border-[#cfd3c6] p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">
-            {menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
+          <Link to="/" className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111827] text-[#d7ff4f]"><Sparkles className="h-4 w-4" /></span><span className="text-sm font-black">RAZORCAGE<span className="text-[#6f7e00]">.AI</span></span></Link>
+          <nav className="hidden items-center gap-7 text-xs font-bold text-[#5f665c] md:flex"><a href="#runtime">Runtime</a><a href="#features">Guardrails</a><a href="#insights">Insights</a><Link to="/dashboard">Mission control</Link></nav>
+          <div className="hidden items-center gap-3 md:flex"><Link to="/store" className="text-xs font-bold text-[#5f665c]">Open storefront</Link><button onClick={launchDemo} className="flex items-center gap-2 rounded-full bg-[#111827] px-4 py-2.5 text-xs font-bold text-white">Launch demo <ArrowRight className="h-3.5 w-3.5 text-[#d7ff4f]" /></button></div>
+          <button className="rounded-full border border-[#cfd3c6] p-2 md:hidden" onClick={() => setMenuOpen(!menuOpen)} aria-label="Toggle menu">{menuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}</button>
         </div>
-        {menuOpen && (
-          <div className="border-t border-[#dfe1d7] px-5 py-4 md:hidden">
-            <div className="flex flex-col gap-4 text-sm font-bold text-[#5f665c]">
-              <a href="#system" onClick={() => setMenuOpen(false)}>System</a>
-              <a href="#guardrails" onClick={() => setMenuOpen(false)}>Guardrails</a>
-              <Link to="/dashboard">Mission control</Link>
-              <button onClick={launchDemo} className="flex items-center gap-2 text-left text-[#111827]">Launch demo <ArrowRight className="h-4 w-4" /></button>
-            </div>
-          </div>
-        )}
+        {menuOpen && <div className="border-t border-[#dfe1d7] px-5 py-4 md:hidden"><div className="flex flex-col gap-4 text-sm font-bold text-[#5f665c]"><a href="#runtime">Runtime</a><a href="#features">Guardrails</a><a href="#insights">Insights</a><Link to="/dashboard">Mission control</Link><button onClick={launchDemo} className="text-left text-[#111827]">Launch demo <ArrowRight className="inline h-4 w-4" /></button></div></div>}
       </header>
 
       <main>
-        <section className="relative border-b border-[#dfe1d7] px-5 pb-16 pt-14 lg:px-8 lg:pb-24 lg:pt-24">
-          <div className="mx-auto grid max-w-7xl items-end gap-12 lg:grid-cols-[1.06fr_.94fr] lg:gap-20">
-            <div>
-              <div className="mb-7 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-[#6f7e00]">
-                <span className="h-2 w-2 rounded-full bg-[#b5d900] shadow-[0_0_0_5px_rgba(181,217,0,.16)]" /> Bounded commerce intelligence
-              </div>
-              <h1 className="max-w-4xl text-[clamp(3.7rem,8vw,8rem)] font-black leading-[.88] tracking-[-0.085em] text-[#111827]">
-                Growth that keeps its <span className="text-[#6f7e00]">context.</span>
-              </h1>
-              <p className="mt-8 max-w-xl text-base leading-7 text-[#687066] lg:text-lg">
-                RazorCage turns every merchant signal into a safe, explainable action. Propose offers, enforce policy, and move payment decisions forward without losing the trail.
-              </p>
-              <div className="mt-9 flex flex-wrap items-center gap-3">
-                <button onClick={launchDemo} className="group flex items-center gap-3 rounded-full bg-[#111827] px-5 py-3.5 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-[#283344]">
-                  <Play className="h-4 w-4 fill-[#d7ff4f] text-[#d7ff4f]" /> Explore the live flow <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" />
-                </button>
-                <Link to="/dashboard" className="flex items-center gap-2 rounded-full border border-[#bfc5b6] px-5 py-3.5 text-sm font-bold text-[#111827] transition hover:border-[#111827]">
-                  View mission control <ChevronRight className="h-4 w-4" />
-                </Link>
-              </div>
-              <div className="mt-10 flex flex-wrap gap-x-6 gap-y-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#8b9186]">
-                <span>● 3-layer safety model</span><span>● Razorpay test mode</span><span>● Merchant-scoped ledger</span>
-              </div>
-            </div>
-
-            <div className="relative">
-              <div className="absolute -inset-5 bg-[#d7ff4f]/40 blur-3xl" />
-              <div className="relative overflow-hidden rounded-[2rem] border border-[#cfd3c6] bg-[#111827] p-3 shadow-[0_30px_80px_rgba(17,24,39,.18)]">
-                <div className="rounded-[1.5rem] border border-white/10 bg-[#192234] p-5 text-white sm:p-7">
-                  <div className="mb-8 flex items-center justify-between border-b border-white/10 pb-4">
-                    <span className="text-xs font-black tracking-[0.16em] text-[#d7ff4f]">LIVE CONTROL ROOM</span>
-                    <span className="flex items-center gap-2 text-[10px] font-bold text-[#aeb8af]"><span className="h-2 w-2 rounded-full bg-[#b5d900]" /> ALL SYSTEMS GO</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-2 border-b border-white/10 pb-7">
-                    <div><p className="text-[10px] text-[#8e9a9d]">PROPOSALS</p><p className="mt-2 text-3xl font-black">1,284</p></div>
-                    <div><p className="text-[10px] text-[#8e9a9d]">APPROVED</p><p className="mt-2 text-3xl font-black text-[#d7ff4f]">942</p></div>
-                    <div><p className="text-[10px] text-[#8e9a9d]">AUDIT RATE</p><p className="mt-2 text-3xl font-black">100%</p></div>
-                  </div>
-                  <div className="mt-6 space-y-3">
-                    {['Brain proposes 12% bundle', 'Cage validates discount', 'Ledger records decision'].map((step, index) => (
-                      <div key={step} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[.04] px-3 py-3">
-                        <span className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-black ${index === 1 ? 'bg-[#d7ff4f] text-[#111827]' : 'bg-white/10 text-white'}`}>{index + 1}</span>
-                        <span className="text-xs font-bold text-[#dce5dc]">{step}</span>
-                        <Check className="ml-auto h-4 w-4 text-[#d7ff4f]" />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-6 flex items-center justify-between rounded-xl bg-[#d7ff4f] px-4 py-3 text-[#111827]">
-                    <span className="text-xs font-black">Safe to execute</span><ShieldCheck className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
-            </div>
+        <section className="relative overflow-hidden bg-[#050607] px-5 py-20 text-white lg:px-8 lg:py-28">
+          <div className="pointer-events-none absolute inset-0 opacity-70 [background:radial-gradient(ellipse_at_50%_35%,rgba(215,255,79,.18),transparent_28%),radial-gradient(ellipse_at_15%_80%,rgba(93,183,255,.16),transparent_32%)]" />
+          <div className="relative mx-auto grid max-w-7xl items-end gap-12 lg:grid-cols-[1.05fr_.95fr] lg:gap-20">
+            <div><p className="mb-7 text-[10px] font-black uppercase tracking-[.22em] text-[#d7ff4f]">● The bounded commerce runtime</p><h1 className="max-w-4xl text-[clamp(3.5rem,8vw,8rem)] font-medium leading-[.9] tracking-[-.075em]">Growth that keeps its <span className="text-white/45">context.</span></h1><p className="mt-8 max-w-xl text-base leading-8 text-white/65 lg:text-lg">Coordinate every merchant signal, offer, approval, and payment in one governed run. Durable context keeps every decision informed and in control.</p><div className="mt-9 flex flex-wrap gap-3"><button onClick={launchDemo} className="flex items-center gap-3 rounded-full bg-white px-5 py-3.5 text-sm font-bold text-[#111827]"><Play className="h-4 w-4 text-[#6f7e00]" /> Explore the live flow <ArrowRight className="h-4 w-4" /></button><Link to="/dashboard" className="flex items-center gap-2 rounded-full border border-white/25 px-5 py-3.5 text-sm font-bold">Open mission control <ChevronRight className="h-4 w-4" /></Link></div><p className="mt-10 text-[10px] font-black uppercase tracking-[.16em] text-white/40">● AI proposes &nbsp; ● Cage bounds &nbsp; ● Ledger remembers</p></div>
+            <div className="rounded-3xl border border-white/15 bg-white/[.06] p-4 backdrop-blur-xl sm:p-6"><div className="mb-7 flex items-center justify-between border-b border-white/10 pb-4"><span className="text-xs font-black tracking-[.16em] text-[#d7ff4f]">LIVE COMMERCE RUNTIME</span><span className="text-[10px] font-bold text-white/50">● RUNNING</span></div><div className="space-y-3">{runtimeSteps.map(([label, title, sub, accent], index) => <div key={label}><div className="flex items-center gap-3 rounded-xl border border-white/15 bg-white/[.06] px-3 py-3"><span className={`flex h-8 w-8 items-center justify-center rounded-lg ${accent} text-xs font-black text-[#111827]`}>{`0${index + 1}`}</span><div><p className="text-[10px] uppercase tracking-widest text-white/40">{label}</p><p className="text-sm font-bold">{title}</p><p className="text-[11px] text-white/45">{sub}</p></div><Check className="ml-auto h-4 w-4 text-[#d7ff4f]" /></div>{index < 2 && <div className="mx-auto h-3 w-px bg-white/25" />}</div>)}</div><div className="mt-6 flex items-center justify-between rounded-xl bg-[#d7ff4f] px-4 py-3 text-[#111827]"><span className="text-xs font-black">Safe to execute</span><ShieldCheck className="h-4 w-4" /></div></div>
           </div>
+          <div className="mx-auto mt-16 max-w-7xl overflow-hidden border-t border-white/10 pt-5"><div className="flex gap-12 whitespace-nowrap text-[10px] font-black uppercase tracking-[.22em] text-white/35">Razorpay checkout · Gemini reasoning · Policy engine · Human approval · Append-only ledger · Merchant isolation</div></div>
         </section>
 
-        <section id="system" className="border-b border-[#dfe1d7] px-5 py-16 lg:px-8 lg:py-24">
-          <div className="mx-auto max-w-7xl">
-            <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-              <div><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#6f7e00]">The operating model</p><h2 className="max-w-2xl text-4xl font-black leading-none tracking-[-.06em] sm:text-6xl">Every decision has a place to land.</h2></div>
-              <p className="max-w-sm text-sm leading-6 text-[#687066]">A continuous loop from merchant signal to governed checkout. Nothing important disappears inside the model.</p>
-            </div>
-            <div className="grid gap-px overflow-hidden rounded-3xl border border-[#cfd3c6] bg-[#cfd3c6] md:grid-cols-3">
-              {[
-                { image: '/onboarding/layer1.png', number: '01', title: 'Brain', text: 'Gemini turns cart and order context into a structured, explainable proposal.', color: 'bg-[#e5f4ff]' },
-                { image: '/onboarding/layer2.png', number: '02', title: 'Cage', text: 'Pure rules validate SKUs, caps, amounts, and whether a human must approve.', color: 'bg-[#eff7d0]' },
-                { image: '/onboarding/layer3.png', number: '03', title: 'Ledger', text: 'Every proposal, clamp, approval, payment, and recovery remains traceable.', color: 'bg-[#fff1d8]' },
-              ].map(item => (
-                <article key={item.number} className={`group ${item.color} p-5 sm:p-7`}>
-                  <div className="mb-8 flex items-center justify-between"><span className="text-xs font-black text-[#697267]">{item.number}</span><ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></div>
-                  <div className="mb-7 h-36 overflow-hidden rounded-2xl border border-black/10 bg-white/40"><img src={item.image} alt={`${item.title} layer`} className="h-full w-full object-cover mix-blend-multiply transition duration-500 group-hover:scale-105" /></div>
-                  <h3 className="text-3xl font-black tracking-[-.05em]">{item.title}</h3><p className="mt-3 max-w-xs text-sm leading-6 text-[#687066]">{item.text}</p>
-                </article>
-              ))}
-            </div>
-          </div>
-        </section>
+        <section id="runtime" className="border-b border-[#dfe1d7] px-5 py-24 lg:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#6f7e00]">Stateful execution</p><h2 className="max-w-3xl text-4xl font-medium leading-none tracking-[-.06em] sm:text-6xl">Every offer resumes with context.</h2><p className="mt-6 max-w-xl text-base leading-7 text-[#687066]">Campaigns, approvals, and checkout decisions do not live in disconnected screens. RazorCage carries reasoning, policy results, and merchant state into the next step.</p><div className="mt-16 overflow-hidden rounded-3xl border border-[#cfd3c6] bg-white shadow-[0_24px_70px_rgba(32,42,32,.08)]"><div className="flex"><aside className="hidden w-48 shrink-0 border-r border-[#e4e6df] p-5 md:block"><div className="mb-8 text-sm font-black">RazorCage</div>{['Overview', 'Storefront', 'Campaigns', 'Approvals', 'Audit Logs'].map((item, index) => <div key={item} className={`mb-1 rounded-lg px-3 py-2 text-xs font-bold ${index === 2 ? 'bg-[#eff7d0] text-[#667500]' : 'text-[#8a9286]'}`}>{item}</div>)}</aside><div className="min-w-0 flex-1 p-5 sm:p-7"><div className="flex items-center justify-between"><div><p className="text-sm font-black">Campaign schedule</p><p className="mt-1 text-xs text-[#8a9286]">Next 7 days · 12 queued</p></div><span className="rounded-full bg-[#eff7d0] px-2.5 py-1 text-[10px] font-black text-[#667500]">LIVE</span></div><div className="mt-6 grid grid-cols-7 text-[10px] font-bold text-[#a0a79d]">{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(day => <span key={day}>{day}</span>)}</div><div className="mt-3 space-y-3">{schedules.map(([name, trigger, first, second]) => <div key={name} className="rounded-xl border border-[#dfe1d7] bg-[#f7f7f2] px-3 py-3"><div className="flex items-center gap-3"><div><p className="text-xs font-black">{name}</p><p className="text-[10px] uppercase tracking-wide text-[#8a9286]">{trigger}</p></div><div className="ml-auto hidden gap-1 sm:flex"><span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold text-[#687066]">{first}</span><span className="rounded-full bg-white px-2 py-1 text-[9px] font-bold text-[#687066]">{second}</span></div></div></div>)}</div><div className="mt-7 grid grid-cols-3 gap-4 border-t border-[#e4e6df] pt-5">{[['Proposals', '1,284'], ['Approved', '942'], ['Policy checks', '100%']].map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-wide text-[#98a094]">{label}</p><p className="mt-2 text-xl font-black">{value}</p></div>)}</div></div></div></div><div className="mt-12 grid gap-8 md:grid-cols-3">{[['Schedule on signal.', 'Start work from a cart event, campaign review, or merchant approval.'], ['Resume with context.', 'Restore proposal reasoning, policy results, and durable order state.'], ['Run with guardrails.', 'Use discount caps, human gates, payment verification, and audit logs.']].map(([title, body]) => <div key={title}><h3 className="text-lg font-black tracking-tight">{title}</h3><p className="mt-2 max-w-xs text-sm leading-6 text-[#687066]">{body}</p></div>)}</div></div></section>
 
-        <section id="guardrails" className="bg-[#111827] px-5 py-16 text-white lg:px-8 lg:py-24">
-          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[.8fr_1.2fr] lg:items-start">
-            <div><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#d7ff4f]">Flexible scheduling, strict bounds</p><h2 className="max-w-xl text-4xl font-black leading-[.95] tracking-[-.06em] sm:text-6xl">Let the agent move. Keep the rules fixed.</h2><p className="mt-6 max-w-md text-sm leading-6 text-[#aeb8af]">RazorCage gives autonomous commerce a dependable rhythm: campaigns can run on schedule, approvals can arrive by signal, and every payment stays inside a policy envelope.</p></div>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {schedules.map(item => { const Icon = item.icon; return <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[.05] p-4 transition hover:-translate-y-1 hover:border-[#d7ff4f]/50"><div className={`mb-12 flex h-9 w-9 items-center justify-center rounded-xl ${item.bg} ${item.color}`}><Icon className="h-4 w-4" /></div><p className="text-sm font-black">{item.label}</p><p className="mt-2 text-[10px] font-bold tracking-wider text-[#89968d]">{item.trigger}</p><span className="mt-5 inline-flex rounded-full border border-[#d7ff4f]/30 px-2 py-1 text-[9px] font-black tracking-widest text-[#d7ff4f]">{item.state}</span></div> })}
-            </div>
-          </div>
-        </section>
+        <section id="features" className="bg-[#111827] px-5 py-24 text-white lg:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#d7ff4f]">Durable autonomy</p><h2 className="max-w-3xl text-4xl font-medium leading-none tracking-[-.06em] sm:text-6xl">Move faster without loosening the bounds.</h2><p className="mt-6 max-w-xl text-base leading-7 text-white/55">Every suggestion has a controlled path to execution.</p><div className="mt-16 grid gap-5 lg:grid-cols-5"><article className="rounded-2xl border border-white/10 bg-white/[.05] p-6 lg:col-span-3"><div className="mb-7 flex items-center justify-between"><span className="text-xs font-black uppercase tracking-widest text-white/45">Multi-stage pipeline</span><span className="text-[10px] font-bold text-[#d7ff4f]">● LIVE</span></div><div className="space-y-3">{['Brain proposes a structured offer', 'Cage validates discount and SKUs', 'Gate requests merchant approval', 'Ledger records the final outcome'].map((step, index) => <div key={step} className="flex items-center gap-3 rounded-xl border border-white/10 px-4 py-3"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs font-black">{index + 1}</span><span className="text-sm font-bold text-white/80">{step}</span><Check className="ml-auto h-4 w-4 text-[#d7ff4f]" /></div>)}</div><div className="mt-8 grid grid-cols-3 gap-4 border-t border-white/10 pt-5">{[['Runs today', '1,247'], ['Policy pass', '99.9%'], ['Handoffs', '342ms']].map(([label, value]) => <div key={label}><p className="text-[10px] uppercase tracking-wide text-white/40">{label}</p><p className="mt-1 text-xl font-black">{value}</p></div>)}</div><h3 className="mt-10 text-2xl font-medium">Brain → Cage → Gate → Ledger</h3></article><article className="rounded-2xl border border-white/10 bg-white/[.05] p-6 lg:col-span-2"><p className="text-xs font-black uppercase tracking-widest text-white/45">Flexible guardrails</p><h3 className="mt-4 text-2xl font-medium">Controls that stay close to the work.</h3><div className="mt-8 space-y-3"><div className="rounded-xl border border-white/10 p-4"><p className="text-sm font-bold">Discount ceiling <span className="float-right rounded-md bg-white/10 px-2 py-1 text-xs">20% max</span></p><p className="mt-1 text-xs text-white/45">Prevent margin leakage</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-sm font-bold">Human Gate <span className="float-right rounded-md bg-white/10 px-2 py-1 text-xs">&gt;15%</span></p><p className="mt-1 text-xs text-white/45">Hold high-value actions</p></div><div className="rounded-xl border border-white/10 p-4"><p className="text-sm font-bold">Sensitive payment actions</p><p className="mt-1 text-xs text-white/45">Choose how the system responds</p><div className="mt-3 flex flex-wrap gap-2">{['Require approval', 'Monitor', 'Block'].map(option => <button key={option} type="button" onClick={() => setGuardrail(option)} className={`rounded-full border px-3 py-1.5 text-xs ${guardrail === option ? 'border-white bg-white text-[#111827]' : 'border-white/20 text-white/65'}`}>{option}</button>)}</div></div></div></article></div></div></section>
 
-        <section id="inbox" className="px-5 py-16 lg:px-8 lg:py-24">
-          <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1.1fr_.9fr] lg:items-center">
-            <div className="order-2 rounded-3xl border border-[#cfd3c6] bg-white p-4 shadow-[0_24px_70px_rgba(32,42,32,.08)] sm:p-6 lg:order-1">
-              <div className="mb-5 flex items-center justify-between border-b border-[#e4e6df] pb-4"><span className="text-xs font-black tracking-[.15em]">AGENT INBOX</span><span className="rounded-full bg-[#eff7d0] px-2.5 py-1 text-[10px] font-black text-[#667500]">3 NEW</span></div>
-              <div className="space-y-2">{inbox.map(item => <div key={item.title} className="flex items-center gap-3 rounded-2xl border border-[#edf0e9] p-3 transition hover:bg-[#f7f7f2]"><span className={`h-2.5 w-2.5 shrink-0 rounded-full ${item.color}`} /><div className="min-w-0 flex-1"><p className="truncate text-sm font-black">{item.title}</p><p className="truncate text-xs text-[#7b8378]">{item.detail}</p></div><span className="text-[10px] font-bold text-[#98a094]">{item.time}</span></div>)}</div>
-              <Link to="/approvals" className="mt-5 flex items-center justify-between rounded-xl bg-[#111827] px-4 py-3 text-xs font-bold text-white">Open approval queue <ArrowRight className="h-4 w-4 text-[#d7ff4f]" /></Link>
-            </div>
-            <div className="order-1 lg:order-2"><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#6f7e00]">One focused queue</p><h2 className="text-4xl font-black leading-[.95] tracking-[-.06em] sm:text-6xl">Keep the work moving, not the tabs.</h2><p className="mt-6 max-w-md text-sm leading-6 text-[#687066]">Review proposals, recovery events, and campaign signals in one calm surface. When action is needed, the next step is obvious.</p><div className="mt-7 flex flex-wrap gap-2"><Link to="/campaigns" className="rounded-full border border-[#bfc5b6] px-4 py-2.5 text-xs font-bold transition hover:border-[#111827]">Campaigns</Link><Link to="/audit" className="rounded-full border border-[#bfc5b6] px-4 py-2.5 text-xs font-bold transition hover:border-[#111827]">Audit logs</Link></div></div>
-          </div>
-        </section>
+        <section id="insights" className="border-b border-[#dfe1d7] px-5 py-24 lg:px-8 lg:py-32"><div className="mx-auto max-w-7xl"><div className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#6f7e00]">Track agent insights</p><h2 className="text-4xl font-medium leading-none tracking-[-.06em] sm:text-6xl">See every decision in real time.</h2></div><p className="max-w-sm text-sm leading-6 text-[#687066]">Your operational routes turn autonomous commerce into an inspectable system.</p></div><div className="mt-16 grid gap-5 md:grid-cols-3">{[['Storefront', 'Turn a cart into an explainable offer.', '/store', BarChart3], ['Campaigns', 'Schedule promotions with policy bounds.', '/campaigns', Clock3], ['Audit Logs', 'Verify every event and payment outcome.', '/audit', FileCheck2]].map(([title, text, path, Icon]) => <Link key={title} to={path} className="group rounded-2xl border border-[#cfd3c6] bg-white p-6 shadow-[0_16px_50px_rgba(32,42,32,.05)]"><div className="flex items-center justify-between"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#eff7d0] text-[#667500]"><Icon className="h-5 w-5" /></span><ArrowRight className="h-4 w-4" /></div><h3 className="mt-10 text-2xl font-black">{title}</h3><p className="mt-2 text-sm leading-6 text-[#687066]">{text}</p></Link>)}</div></div></section>
 
-        <section className="border-t border-[#dfe1d7] bg-[#d7ff4f] px-5 py-16 lg:px-8 lg:py-20">
-          <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-end"><div><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#566000]">Ready when you are</p><h2 className="max-w-3xl text-5xl font-black leading-[.9] tracking-[-.07em] sm:text-7xl">Make your next offer earn its way in.</h2></div><button onClick={launchDemo} className="flex shrink-0 items-center gap-3 rounded-full bg-[#111827] px-5 py-3.5 text-sm font-bold text-white transition hover:bg-[#283344]">Start with a live cart <ArrowRight className="h-4 w-4 text-[#d7ff4f]" /></button></div>
-        </section>
+        <section className="relative overflow-hidden bg-[#d7ff4f] px-5 py-24 lg:px-8 lg:py-32"><div className="relative mx-auto flex max-w-7xl flex-col items-start justify-between gap-8 md:flex-row md:items-end"><div><p className="mb-3 text-[10px] font-black uppercase tracking-[.2em] text-[#566000]">Ready when you are</p><h2 className="max-w-3xl text-5xl font-medium leading-[.9] tracking-[-.07em] sm:text-7xl">Stop babysitting offers. Let them earn their way in.</h2><p className="mt-6 max-w-lg text-base leading-7 text-[#566000]">Turn every recurring merchant signal into reliable, bounded work that carries its context forward.</p></div><button onClick={launchDemo} className="flex shrink-0 items-center gap-3 rounded-full bg-[#111827] px-5 py-3.5 text-sm font-bold text-white">Start with a live cart <ArrowRight className="h-4 w-4 text-[#d7ff4f]" /></button></div></section>
       </main>
-
-      <footer className="bg-[#f7f7f2] px-5 py-7 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-[#687066] sm:flex-row sm:items-center sm:justify-between"><span className="font-black tracking-[-.02em] text-[#111827]">RAZORCAGE<span className="text-[#6f7e00]">.AI</span></span><span>Explainable, bounded commerce intelligence · Razorpay AI Commerce Hackathon</span><div className="flex gap-4 font-bold"><Link to="/store">Storefront</Link><Link to="/dashboard">Mission control</Link></div></div></footer>
+      <footer className="bg-[#f7f7f2] px-5 py-7 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col gap-4 text-xs text-[#687066] sm:flex-row sm:items-center sm:justify-between"><span className="font-black text-[#111827]">RAZORCAGE<span className="text-[#6f7e00]">.AI</span></span><span>Explainable, bounded commerce intelligence · Razorpay AI Commerce Hackathon</span><div className="flex gap-4 font-bold"><Link to="/store">Storefront</Link><Link to="/dashboard">Mission control</Link></div></div></footer>
     </div>
   )
 }
