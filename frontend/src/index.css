@@ -373,3 +373,101 @@ body {
   background: #f7f7f2 !important;
   border-color: #dfe1d7 !important;
 }
+
+/* === Approvals uses the onboarding human-gate theme === */
+.approvals-theme {
+  background: #f7f7f2 !important;
+  color: #111827;
+}
+
+.approvals-theme nav {
+  background: rgba(247, 247, 242, 0.95) !important;
+  border-color: #dfe1d7 !important;
+  color: #111827 !important;
+}
+
+.approvals-theme [class*="bg-[#07090e]"],
+.approvals-theme [class*="bg-[#0e111b]"],
+.approvals-theme [class*="bg-[#121625]"],
+.approvals-theme [class*="bg-[#0f172a]"],
+.approvals-theme [class*="bg-gray-900"] {
+  background: #ffffff !important;
+}
+
+.approvals-theme [class*="border-gray-800"],
+.approvals-theme [class*="border-[#1b1f32"],
+.approvals-theme [class*="border-white/5"],
+.approvals-theme [class*="border-white/10"] {
+  border-color: #dfe1d7 !important;
+}
+
+.approvals-theme [class*="text-white"] {
+  color: #111827 !important;
+}
+
+.approvals-theme [class*="text-gray-200"],
+.approvals-theme [class*="text-gray-300"],
+.approvals-theme [class*="text-gray-400"],
+.approvals-theme [class*="text-gray-500"],
+.approvals-theme [class*="text-gray-600"] {
+  color: #687066 !important;
+}
+
+.approvals-theme [class*="hover:text-white"]:hover {
+  color: #111827 !important;
+}
+
+.approvals-theme [class*="bg-blue-950"],
+.approvals-theme [class*="bg-[#0f172a"] {
+  background: #e5f4ff !important;
+}
+
+.approvals-theme [class*="text-cyan-200"],
+.approvals-theme [class*="text-cyan-300"],
+.approvals-theme [class*="text-cyan-400"],
+.approvals-theme [class*="text-blue-300"],
+.approvals-theme [class*="text-blue-400"] {
+  color: #28729c !important;
+}
+
+.approvals-theme [class*="bg-amber-950"],
+.approvals-theme [class*="bg-[#1c1612"] {
+  background: #fff1d8 !important;
+}
+
+.approvals-theme [class*="text-amber-200"],
+.approvals-theme [class*="text-amber-300"],
+.approvals-theme [class*="text-amber-400"] {
+  color: #9a6400 !important;
+}
+
+.approvals-theme [class*="bg-emerald-950"] {
+  background: #eff7d0 !important;
+}
+
+.approvals-theme [class*="text-emerald-300"],
+.approvals-theme [class*="text-emerald-400"] {
+  color: #3d7a32 !important;
+}
+
+.approvals-theme [class*="bg-rose-950"] {
+  background: #fff0ed !important;
+}
+
+.approvals-theme [class*="text-rose-300"] {
+  color: #a34c3c !important;
+}
+
+.approvals-theme [class*="bg-emerald-500"] {
+  background: #111827 !important;
+  color: #ffffff !important;
+}
+
+.approvals-theme [class*="hover:bg-emerald-400"]:hover {
+  background: #394653 !important;
+}
+
+.approvals-theme footer {
+  background: #f7f7f2 !important;
+  border-color: #dfe1d7 !important;
+}

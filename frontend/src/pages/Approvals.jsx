@@ -14,7 +14,7 @@ export default function Approvals() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white">
+    <div className="approvals-theme min-h-screen bg-[#f7f7f2] text-[#111827] flex flex-col font-sans selection:bg-[#d7ff4f] selection:text-[#111827]">
       {/* Top Navbar */}
       <Navbar />
 
