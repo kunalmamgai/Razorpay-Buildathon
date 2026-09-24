@@ -175,6 +175,15 @@ def _ensure_offer_not_invalidated(offer_id: str, merchant_id: str = "merchant_de
             )
 
 
+def _get_existing_order(idempotency_key: str, merchant_id: str = "merchant_default") -> dict | None:
+    """Return an existing local order so client retries do not create another order."""
+    with get_db(merchant_id) as conn:
+        row = conn.execute(
+            "SELECT * FROM orders WHERE idempotency_key = ?", (idempotency_key,)
+        ).fetchone()
+        return dict(row) if row else None
+
+
 def propose_checkout(
     cart: list[dict],
     idempotency_key: str | None = None,
@@ -336,6 +345,19 @@ def approve_checkout(ledger_id: int, merchant_id: str = "merchant_default") -> d
     _ensure_offer_not_invalidated(offer_id, merchant_id=merchant_id)
 
     idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
+    existing_order = _get_existing_order(idempotency_key, merchant_id=merchant_id)
+    if existing_order:
+        key_id, _, _ = resolve_merchant_credentials(merchant_id)
+        return {
+            "entry_id": ledger_id,
+            "correlation_id": correlation_id,
+            "order_id": existing_order["razorpay_order_id"],
+            "razorpay_key_id": key_id,
+            "final_amount_paise": existing_order["final_amount"],
+            "discount_pct": discount_pct,
+            "merchant_id": merchant_id,
+        }
+
     order_data = sync_create_order(
         final_amount,
         idempotency_key=idempotency_key,
@@ -424,6 +446,19 @@ def create_order_from_proposal(
 
     if idempotency_key is None:
         idempotency_key = entry.get("idempotency_key") or f"idem_{uuid.uuid4().hex[:16]}"
+
+    existing_order = _get_existing_order(idempotency_key, merchant_id=merchant_id)
+    if existing_order:
+        key_id, _, _ = resolve_merchant_credentials(merchant_id)
+        return {
+            "entry_id": ledger_id,
+            "correlation_id": correlation_id,
+            "order_id": existing_order["razorpay_order_id"],
+            "razorpay_key_id": key_id,
+            "final_amount_paise": existing_order["final_amount"],
+            "discount_pct": discount_pct,
+            "merchant_id": merchant_id,
+        }
 
     order_data = sync_create_order(
         final_amount,

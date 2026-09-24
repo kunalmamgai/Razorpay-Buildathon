@@ -151,23 +151,15 @@ def seed_default_merchants():
 
 def get_merchant(merchant_id: str) -> dict:
     """Fetch merchant info and policy configuration by merchant_id.
-    
-    Fallback to merchant_default if requested merchant_id does not exist.
     """
     init_master_db()
     with get_master_db() as conn:
         row = conn.execute(
             "SELECT * FROM merchants WHERE merchant_id = ?", (merchant_id,)
         ).fetchone()
-        if not row and merchant_id != "merchant_default":
-            logger.warning(f"Merchant '{merchant_id}' not found, falling back to 'merchant_default'")
-            row = conn.execute(
-                "SELECT * FROM merchants WHERE merchant_id = 'merchant_default'"
-            ).fetchone()
 
         if not row:
-            # Fallback inline config if DB not populated yet
-            return DEFAULT_MERCHANTS[0]
+            raise KeyError(f"Merchant '{merchant_id}' is not registered")
 
         data = dict(row)
         try:
@@ -190,6 +182,9 @@ def list_merchants() -> list[dict]:
             except Exception:
                 d["policy_config"] = {}
             # Redact secrets for API output safety
-            d["razorpay_key_secret_masked"] = "***" if d.get("razorpay_key_secret") else ""
+            has_key_secret = bool(d.get("razorpay_key_secret"))
+            d.pop("razorpay_key_secret", None)
+            d.pop("razorpay_webhook_secret", None)
+            d["razorpay_key_secret_masked"] = "***" if has_key_secret else ""
             result.append(d)
         return result

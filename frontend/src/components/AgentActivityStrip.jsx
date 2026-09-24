@@ -36,11 +36,11 @@ function AgentActivityStrip() {
       {schedule.scheduler_running && !countdown.expired ? (
         <span className="text-xs text-gray-400">
           Next autonomous review in{' '}
-          <span className="font-mono text-clamped">{countdown.remainingLabel}</span>
+          <span className="font-mono text-cyan-300">{countdown.remainingLabel}</span>
           {' '}(every {schedule.interval_minutes} min)
         </span>
       ) : schedule.scheduler_running ? (
-        <span className="text-xs text-gray-400 font-mono text-clamped">Review due — running...</span>
+        <span className="text-xs font-mono text-cyan-300">Review due — running...</span>
       ) : (
         <span className="text-xs text-gray-500">
           Scheduler offline — reviews run on manual trigger only

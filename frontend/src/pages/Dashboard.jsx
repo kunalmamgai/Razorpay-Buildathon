@@ -16,7 +16,7 @@ import Navbar from '../components/Navbar'
 
 const LEDGER_POLL_MS = 5000
 
-// Default diverse realistic entries reordered (Approved & Failed cards brought to top, followed by Clamped & Rejected)
+// Representative entries used only by the demo tour copy below.
 const DEFAULT_LEDGER_ENTRIES = [
   {
     id: 9922,
@@ -79,23 +79,18 @@ const DEFAULT_LEDGER_ENTRIES = [
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState('overview') // overview | monitoring | policies | campaigns | approvals
-  const [ledger, setLedger] = useState(DEFAULT_LEDGER_ENTRIES)
-  const [stats, setStats] = useState({ total_proposals: 14208, approved: 8421, clamped: 4102, rejected: 1245, failed: 440 })
+  const [ledger, setLedger] = useState([])
+  const [stats, setStats] = useState({ total_proposals: 0, approved: 0, clamped: 0, rejected: 0, failed: 0 })
   const [filter, setFilter] = useState(null)
   const [selectedEntry, setSelectedEntry] = useState(null)
   const [campaigns, setCampaigns] = useState([])
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [newEvents, setNewEvents] = useState(0)
   const maxSeenIdRef = useRef(0)
 
   const ingestLedger = (entries) => {
     const combined = [...entries]
-    // Append default examples if missing to ensure all 4 types exist for demonstration
-    DEFAULT_LEDGER_ENTRIES.forEach(def => {
-      if (!combined.some(e => e.id === def.id || e.outcome === def.outcome)) {
-        combined.push(def)
-      }
-    })
     
     if (maxSeenIdRef.current && combined.length) {
       const fresh = combined.filter(e => e.id > maxSeenIdRef.current).length
@@ -113,12 +108,13 @@ export default function Dashboard() {
         fetchLedger(100, filter),
         fetchLedgerStats(),
       ])
-      const entries = ledgerData.entries && ledgerData.entries.length > 0 ? ledgerData.entries : DEFAULT_LEDGER_ENTRIES
-      ingestLedger(entries)
+      setLoadError('')
+      ingestLedger(ledgerData.entries || [])
       if (statsData) setStats(statsData)
     } catch (e) {
       console.error('Failed to fetch ledger:', e)
-      setLedger(DEFAULT_LEDGER_ENTRIES)
+      setLoadError('Ledger data is temporarily unavailable.')
+      setLedger([])
     }
   }
 
@@ -248,6 +244,11 @@ export default function Dashboard() {
 
         {/* Top Volume Stats & Pipeline Reference Cards */}
         <StatStrip stats={stats} />
+        {loadError && (
+          <div className="mb-4 rounded-xl border border-amber-500/30 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            {loadError}
+          </div>
+        )}
 
         {/* TAB 1: OVERVIEW / LIVE LEDGER STREAM */}
         {activeTab === 'overview' && (

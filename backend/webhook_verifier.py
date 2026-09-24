@@ -37,8 +37,8 @@ def verify_webhook_signature(
         secret = RAZORPAY_WEBHOOK_SECRET
 
     if not secret:
-        logger.warning("Webhook secret not configured — accepting signature in test mode")
-        return True
+        logger.error("Webhook secret is not configured")
+        return False
 
     if not signature:
         logger.warning("No webhook signature provided in request headers")
@@ -87,8 +87,8 @@ def verify_payment_signature(
         key_secret = RAZORPAY_KEY_SECRET
 
     if not key_secret:
-        logger.warning("Razorpay key secret not configured — skipping payment signature verification")
-        return True
+        logger.error("Razorpay key secret is not configured")
+        return False
 
     if not signature or not order_id or not payment_id:
         return False

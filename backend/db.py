@@ -133,6 +133,8 @@ def init_db(merchant_id: str = "merchant_default"):
                 ON ledger(razorpay_order_id);
             CREATE INDEX IF NOT EXISTS idx_orders_idempotency
                 ON orders(idempotency_key);
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_idempotency_unique
+                ON orders(idempotency_key) WHERE idempotency_key IS NOT NULL;
 
             CREATE TABLE IF NOT EXISTS campaigns (
                 id TEXT PRIMARY KEY,

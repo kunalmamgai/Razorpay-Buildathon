@@ -67,13 +67,6 @@ def get_conversion_funnel(merchant_id: str = "merchant_default") -> Dict[str, An
 
         stage5_paid = conn.execute("SELECT COUNT(*) FROM orders WHERE status = 'paid'").fetchone()[0]
 
-        if stage1_proposals == 0:
-            stage1_proposals = 124
-            stage2_policy_passed = 110
-            stage3_approved = 94
-            stage4_orders = 82
-            stage5_paid = 76
-
         def pct(a, b):
             return round((a / b * 100), 1) if b > 0 else 0.0
 
@@ -194,15 +187,5 @@ def detect_anomalies(merchant_id: str = "merchant_default") -> List[Dict[str, An
                 "details": f"{rejection_count} out of recent {total_recent} proposals were rejected by Cage guardrails.",
                 "timestamp": "Rolling Window",
             })
-
-    if not anomalies:
-        anomalies.append({
-            "id": "ANOM-DEMO-01",
-            "type": "aggressive_discount",
-            "severity": "warning",
-            "title": "Aggressive Discount (35%) Proactively Clamped",
-            "details": "Agent Promo-Orchestrator proposed 35% flash sale discount. Clamped to 20% by Cage Policy Engine.",
-            "timestamp": "14:01:10 UTC",
-        })
 
     return anomalies

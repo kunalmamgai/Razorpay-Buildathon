@@ -119,9 +119,9 @@ async def async_verify_payment_signature(
     """Async verify Razorpay payment signature with merchant key secret."""
     _, key_secret, _ = resolve_merchant_credentials(merchant_id, credentials)
 
-    if not key_secret or "secret_" in key_secret:
-        logger.info(f"[MOCK] Accepting payment signature for merchant {merchant_id or 'default'}")
-        return True
+    if not key_secret or not signature:
+        logger.warning("Payment signature cannot be verified without a configured secret")
+        return False
 
     data = f"{order_id}|{payment_id}"
     try:
@@ -145,9 +145,9 @@ async def async_verify_webhook_signature(
     """Async verify Razorpay webhook signature with merchant webhook secret."""
     _, _, webhook_secret = resolve_merchant_credentials(merchant_id, credentials)
 
-    if not webhook_secret or "whsec_" in webhook_secret:
-        logger.info(f"[MOCK] Accepting webhook signature for merchant {merchant_id or 'default'}")
-        return True
+    if not webhook_secret or not signature:
+        logger.warning("Webhook signature cannot be verified without a configured secret")
+        return False
 
     try:
         expected_signature = hmac.new(
@@ -190,5 +190,14 @@ def sync_verify_payment_signature(
     signature: str,
     merchant_id: str | None = None,
 ) -> bool:
-    """Synchronous fallback for signature verification."""
-    return True
+    """Verify a payment signature using the active merchant's key secret."""
+    _, key_secret, _ = resolve_merchant_credentials(merchant_id)
+    if not key_secret or not payment_id or not order_id or not signature:
+        return False
+
+    expected_signature = hmac.new(
+        key_secret.encode(),
+        f"{order_id}|{payment_id}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected_signature, signature)
