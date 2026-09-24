@@ -567,3 +567,65 @@ body {
 .audit-theme tr:hover {
   background: #f4f6ee !important;
 }
+
+/* === Onboarding image language === */
+.onboarding-theme > main > section {
+  position: relative;
+  isolation: isolate;
+}
+
+.onboarding-theme > main > section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-position: 92% 50%;
+  background-size: min(34vw, 420px) auto;
+  opacity: 0.12;
+  mix-blend-mode: multiply;
+}
+
+.onboarding-theme > main > section > * {
+  position: relative;
+  z-index: 1;
+}
+
+.onboarding-theme > main > section:nth-child(1)::after {
+  background-image: url('/onboarding/layer1.png');
+  opacity: 0.16;
+  mix-blend-mode: screen;
+}
+
+.onboarding-theme > main > section:nth-child(2)::after {
+  background-image: url('/onboarding/layer2.png');
+  background-position: 96% 20%;
+}
+
+.onboarding-theme > main > section:nth-child(3)::after {
+  background-image: url('/onboarding/layer3.png');
+  background-position: 7% 65%;
+  opacity: 0.1;
+  mix-blend-mode: screen;
+}
+
+.onboarding-theme > main > section:nth-child(4)::after {
+  background-image: url('/products/SKU_101.jpg');
+  background-position: 94% 35%;
+  opacity: 0.1;
+}
+
+.onboarding-theme > main > section:nth-child(5)::after {
+  background-image: url('/onboarding/layer3.png');
+  background-position: 7% 50%;
+  opacity: 0.1;
+}
+
+@media (max-width: 768px) {
+  .onboarding-theme > main > section::after {
+    background-position: 50% 85%;
+    background-size: 260px auto;
+    opacity: 0.07;
+  }
+}

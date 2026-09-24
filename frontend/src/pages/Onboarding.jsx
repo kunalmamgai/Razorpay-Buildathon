@@ -33,7 +33,7 @@ export default function Onboarding() {
   }
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#f7f7f2] text-[#111827] selection:bg-[#d7ff4f]">
+    <div className="onboarding-theme min-h-screen overflow-hidden bg-[#f7f7f2] text-[#111827] selection:bg-[#d7ff4f]">
       <header className="sticky top-0 z-50 border-b border-[#dfe1d7] bg-[#f7f7f2]/95 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
           <Link to="/" className="flex items-center gap-3"><span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#111827] text-[#d7ff4f]"><Sparkles className="h-4 w-4" /></span><span className="text-sm font-black">RAZORCAGE<span className="text-[#6f7e00]">.AI</span></span></Link>
