@@ -164,3 +164,116 @@ body {
 .mission-control-theme .overflow-x-auto::-webkit-scrollbar {
   display: none;
 }
+
+/* === Storefront uses the onboarding commerce theme === */
+.storefront-theme {
+  background: #f7f7f2 !important;
+  color: #111827;
+}
+
+.storefront-theme > .absolute {
+  display: none;
+}
+
+.storefront-theme nav {
+  background: rgba(247, 247, 242, 0.95) !important;
+  border-color: #dfe1d7 !important;
+  color: #111827 !important;
+}
+
+.storefront-theme [class*="bg-[#07090e]"],
+.storefront-theme [class*="bg-[#090b11]"],
+.storefront-theme [class*="bg-[#090c15]"],
+.storefront-theme [class*="bg-[#0b0e1a]"],
+.storefront-theme [class*="bg-[#0e111b]"],
+.storefront-theme [class*="bg-[#121625]"],
+.storefront-theme [class*="bg-gray-900"] {
+  background: #ffffff !important;
+}
+
+.storefront-theme [class*="border-gray-800"],
+.storefront-theme [class*="border-gray-800/"],
+.storefront-theme [class*="border-[#1b1f32]"],
+.storefront-theme [class*="border-white/5"],
+.storefront-theme [class*="border-white/10"] {
+  border-color: #dfe1d7 !important;
+}
+
+.storefront-theme [class*="text-white"] {
+  color: #111827 !important;
+}
+
+.storefront-theme [class*="text-gray-300"],
+.storefront-theme [class*="text-gray-400"],
+.storefront-theme [class*="text-gray-500"],
+.storefront-theme [class*="text-gray-600"],
+.storefront-theme [class*="text-gray-700"] {
+  color: #687066 !important;
+}
+
+.storefront-theme [class*="hover:text-white"]:hover {
+  color: #111827 !important;
+}
+
+.storefront-theme [class*="bg-blue-950"],
+.storefront-theme [class*="bg-cyan-950"],
+.storefront-theme [class*="bg-purple-950"] {
+  background: #e5f4ff !important;
+}
+
+.storefront-theme [class*="bg-amber-950"] {
+  background: #fff1d8 !important;
+}
+
+.storefront-theme [class*="bg-emerald-950"] {
+  background: #eff7d0 !important;
+}
+
+.storefront-theme [class*="bg-red-950"] {
+  background: #fff0ed !important;
+}
+
+.storefront-theme [class*="text-cyan-200"],
+.storefront-theme [class*="text-cyan-300"],
+.storefront-theme [class*="text-cyan-400"] {
+  color: #587000 !important;
+}
+
+.storefront-theme [class*="text-blue-300"],
+.storefront-theme [class*="text-blue-400"] {
+  color: #28729c !important;
+}
+
+.storefront-theme [class*="text-amber-300"],
+.storefront-theme [class*="text-amber-400"] {
+  color: #9a6400 !important;
+}
+
+.storefront-theme [class*="text-emerald-300"],
+.storefront-theme [class*="text-emerald-400"] {
+  color: #3d7a32 !important;
+}
+
+.storefront-theme [class*="text-red-300"],
+.storefront-theme [class*="text-red-400"] {
+  color: #a34c3c !important;
+}
+
+.storefront-theme [class*="bg-gradient-to-r"] {
+  background-image: linear-gradient(135deg, #111827 0%, #394653 100%) !important;
+}
+
+.storefront-theme button[class*="bg-gradient-to-r"] {
+  color: #ffffff !important;
+}
+
+.storefront-theme [class*="shadow-blue-"],
+.storefront-theme [class*="shadow-xl"],
+.storefront-theme [class*="shadow-2xl"] {
+  box-shadow: 0 14px 35px rgba(32, 42, 32, 0.08) !important;
+}
+
+.storefront-theme footer {
+  background: #f7f7f2 !important;
+  border-color: #dfe1d7 !important;
+}

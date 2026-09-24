@@ -244,7 +244,7 @@ export default function Storefront() {
   const cartTotalItemsCount = cart.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white relative overflow-x-hidden">
+    <div className="storefront-theme min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white relative overflow-x-hidden">
       {/* Ambient lighting glows matching landing page */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[350px] bg-gradient-to-b from-blue-900/15 via-indigo-900/10 to-transparent blur-3xl pointer-events-none" />
 
@@ -431,7 +431,7 @@ export default function Storefront() {
                               <span className="text-[11px] text-gray-500 line-through font-mono">
                                 {formatCurrency(product.price)}
                               </span>
-                              <span className="text-base font-extrabold text-white font-mono text-amber-300">
+                              <span className="text-base font-extrabold font-mono text-amber-300">
                                 {formatCurrency(dealPrice)}
                               </span>
                             </>
