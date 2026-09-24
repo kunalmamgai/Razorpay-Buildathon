@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { ShieldCheck, Sparkles, LayoutDashboard, ShoppingBag, CheckSquare, FileText, Store, Menu, X } from 'lucide-react'
+import { Sparkles, LayoutDashboard, ShoppingBag, CheckSquare, FileText, Store, Menu, X } from 'lucide-react'
 import { fetchMerchants, getActiveMerchant, setActiveMerchant } from '../api'
 
 export default function Navbar({ cartCount = 0 }) {
@@ -38,7 +38,6 @@ export default function Navbar({ cartCount = 0 }) {
   const isLanding = location.pathname === '/' || location.pathname === '/onboarding'
 
   const navLinks = [
-    { to: '/', label: 'Overview', icon: ShieldCheck, active: isLanding, color: 'text-cyan-400', activeStyle: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
     { to: '/dashboard', label: 'Mission Control', icon: LayoutDashboard, active: isDashboard, color: 'text-purple-400', activeStyle: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
     { to: '/store', label: 'Storefront', icon: ShoppingBag, active: isStore, color: 'text-blue-400', activeStyle: 'bg-blue-500/15 text-blue-400 border-blue-500/30' },
     { to: '/campaigns', label: 'Campaigns', icon: Sparkles, active: isCampaigns, color: 'text-amber-400', activeStyle: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
