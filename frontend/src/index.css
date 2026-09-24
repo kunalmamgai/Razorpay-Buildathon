@@ -94,3 +94,73 @@ body {
   background: #4C3A6E;
   border-radius: 3px;
 }
+
+/* === Mission Control uses the onboarding editorial theme === */
+.mission-control-theme {
+  background: #f7f7f2 !important;
+  color: #111827;
+}
+
+.mission-control-theme nav {
+  background: rgba(247, 247, 242, 0.95) !important;
+  border-color: #dfe1d7 !important;
+  color: #111827 !important;
+}
+
+.mission-control-theme [class*="bg-[#07090e]"],
+.mission-control-theme [class*="bg-[#0d0f17]"],
+.mission-control-theme [class*="bg-[#0e111b]"],
+.mission-control-theme [class*="bg-[#121625]"],
+.mission-control-theme [class*="bg-gray-900"] {
+  background: #ffffff !important;
+}
+
+.mission-control-theme [class*="border-gray-800"],
+.mission-control-theme [class*="border-[#1b1f32]"],
+.mission-control-theme [class*="border-white/5"],
+.mission-control-theme [class*="border-white/10"] {
+  border-color: #dfe1d7 !important;
+}
+
+.mission-control-theme [class*="text-white"] {
+  color: #111827 !important;
+}
+
+.mission-control-theme [class*="text-gray-200"],
+.mission-control-theme [class*="text-gray-300"],
+.mission-control-theme [class*="text-gray-400"],
+.mission-control-theme [class*="text-gray-500"] {
+  color: #687066 !important;
+}
+
+.mission-control-theme [class*="hover:bg-gray-800"]:hover {
+  background: #eef0e8 !important;
+}
+
+.mission-control-theme [class*="bg-blue-500/15"] {
+  background: #e5f4ff !important;
+  border-color: #9bd6f5 !important;
+}
+
+.mission-control-theme [class*="text-cyan-300"],
+.mission-control-theme [class*="text-cyan-400"] {
+  color: #587000 !important;
+}
+
+.mission-control-theme [class*="bg-emerald-950/80"] {
+  background: #eff7d0 !important;
+  border-color: #c6df64 !important;
+}
+
+.mission-control-theme footer {
+  background: #f7f7f2 !important;
+  border-color: #dfe1d7 !important;
+}
+
+.mission-control-theme .overflow-x-auto {
+  scrollbar-width: none;
+}
+
+.mission-control-theme .overflow-x-auto::-webkit-scrollbar {
+  display: none;
+}

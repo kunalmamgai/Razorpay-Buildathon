@@ -68,7 +68,7 @@ export default function Navbar({ cartCount = 0 }) {
         </div>
 
         {/* Center Main Navigation Links (Desktop) */}
-        <div className="hidden md:flex items-center gap-1.5 lg:gap-2">
+        <div className="hidden lg:flex items-center gap-1.5 lg:gap-2">
           {navLinks.map((link) => {
             const Icon = link.icon
             return (
@@ -108,7 +108,7 @@ export default function Navbar({ cartCount = 0 }) {
           {/* Mobile Hamburger Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-xl bg-[#121625] border border-white/10 text-gray-300 hover:text-white"
+            className="lg:hidden p-2 rounded-xl bg-[#121625] border border-white/10 text-gray-300 hover:text-white"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -118,7 +118,7 @@ export default function Navbar({ cartCount = 0 }) {
 
       {/* Mobile Drawer Dropdown Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0d0f17] border-b border-gray-800 px-4 py-3 space-y-1.5 font-mono animate-fadeIn">
+        <div className="lg:hidden bg-[#0d0f17] border-b border-gray-800 px-4 py-3 space-y-1.5 font-mono animate-fadeIn">
           {navLinks.map((link) => {
             const Icon = link.icon
             return (

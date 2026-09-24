@@ -181,7 +181,7 @@ export default function Dashboard() {
   })
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white">
+    <div className="mission-control-theme min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white">
       {/* Top Main Navbar */}
       <Navbar />
 
