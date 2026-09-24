@@ -611,9 +611,7 @@ body {
 }
 
 .onboarding-theme > main > section:nth-child(4)::after {
-  background-image: url('/products/SKU_101.jpg');
-  background-position: 94% 35%;
-  opacity: 0.15;
+  display: none;
 }
 
 .onboarding-theme > main > section:nth-child(5)::after {
