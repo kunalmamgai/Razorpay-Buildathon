@@ -123,7 +123,7 @@ export default function AuditLogs() {
   })
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-white flex flex-col font-sans selection:bg-blue-500 selection:text-white">
+    <div className="audit-theme min-h-screen bg-[#f7f7f2] text-[#111827] flex flex-col font-sans selection:bg-[#d7ff4f] selection:text-[#111827]">
       <Navbar />
 
       <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">

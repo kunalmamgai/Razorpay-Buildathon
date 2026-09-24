@@ -417,8 +417,7 @@ body {
   color: #111827 !important;
 }
 
-.approvals-theme [class*="bg-blue-950"],
-.approvals-theme [class*="bg-[#0f172a"] {
+.approvals-theme [class*="bg-blue-950"] {
   background: #e5f4ff !important;
 }
 
@@ -430,8 +429,7 @@ body {
   color: #28729c !important;
 }
 
-.approvals-theme [class*="bg-amber-950"],
-.approvals-theme [class*="bg-[#1c1612"] {
+.approvals-theme [class*="bg-amber-950"] {
   background: #fff1d8 !important;
 }
 
@@ -470,4 +468,102 @@ body {
 .approvals-theme footer {
   background: #f7f7f2 !important;
   border-color: #dfe1d7 !important;
+}
+
+/* === Audit Logs uses the onboarding forensic theme === */
+.audit-theme {
+  background: #f7f7f2 !important;
+  color: #111827;
+}
+
+.audit-theme nav {
+  background: rgba(247, 247, 242, 0.95) !important;
+  border-color: #dfe1d7 !important;
+  color: #111827 !important;
+}
+
+.audit-theme [class*="bg-[#07090e]"],
+.audit-theme [class*="bg-[#0e111b]"],
+.audit-theme [class*="bg-[#121625]"],
+.audit-theme [class*="bg-[#090b12]"],
+.audit-theme [class*="bg-gray-900"] {
+  background: #ffffff !important;
+}
+
+.audit-theme [class*="border-gray-800"],
+.audit-theme [class*="border-[#1b1f32]"],
+.audit-theme [class*="border-white/5"],
+.audit-theme [class*="border-white/10"] {
+  border-color: #dfe1d7 !important;
+}
+
+.audit-theme [class*="text-white"] {
+  color: #111827 !important;
+}
+
+.audit-theme [class*="text-gray-200"],
+.audit-theme [class*="text-gray-300"],
+.audit-theme [class*="text-gray-400"],
+.audit-theme [class*="text-gray-500"],
+.audit-theme [class*="text-gray-600"] {
+  color: #687066 !important;
+}
+
+.audit-theme [class*="hover:text-white"]:hover {
+  color: #111827 !important;
+}
+
+.audit-theme [class*="bg-blue-950"],
+.audit-theme [class*="bg-blue-500/10"],
+.audit-theme [class*="bg-blue-500/20"] {
+  background: #e5f4ff !important;
+}
+
+.audit-theme [class*="text-blue-300"],
+.audit-theme [class*="text-blue-400"],
+.audit-theme [class*="text-cyan-200"],
+.audit-theme [class*="text-cyan-300"],
+.audit-theme [class*="text-cyan-400"] {
+  color: #28729c !important;
+}
+
+.audit-theme [class*="bg-amber-950"],
+.audit-theme [class*="bg-amber-500/20"] {
+  background: #fff1d8 !important;
+}
+
+.audit-theme [class*="text-amber-200"],
+.audit-theme [class*="text-amber-300"],
+.audit-theme [class*="text-amber-400"] {
+  color: #9a6400 !important;
+}
+
+.audit-theme [class*="bg-emerald-950"],
+.audit-theme [class*="bg-emerald-500/10"],
+.audit-theme [class*="bg-emerald-500/20"] {
+  background: #eff7d0 !important;
+}
+
+.audit-theme [class*="text-emerald-300"],
+.audit-theme [class*="text-emerald-400"] {
+  color: #3d7a32 !important;
+}
+
+.audit-theme [class*="bg-rose-950"] {
+  background: #fff0ed !important;
+}
+
+.audit-theme [class*="text-rose-300"],
+.audit-theme [class*="text-rose-400"] {
+  color: #a34c3c !important;
+}
+
+.audit-theme input {
+  background: #ffffff !important;
+  color: #111827 !important;
+  border-color: #cfd3c6 !important;
+}
+
+.audit-theme tr:hover {
+  background: #f4f6ee !important;
 }
